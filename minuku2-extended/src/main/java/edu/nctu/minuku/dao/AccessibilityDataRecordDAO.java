@@ -23,7 +23,7 @@ import edu.nctu.minukucore.user.User;
 
 public class AccessibilityDataRecordDAO implements DAO<AccessibilityDataRecord> {
 
-    private final String TAG = "AccessibilityDataRecordDAO";
+    private final String TAG = "AccessibilityDAO";
 
     private DBHelper dBHelper;
     private Context mContext;
@@ -60,9 +60,6 @@ public class AccessibilityDataRecordDAO implements DAO<AccessibilityDataRecord> 
             values.clear();
             DBManager.getInstance().closeDatabase();
         }
-
-
-
     }
 
     public void query_check() {
@@ -98,5 +95,6 @@ public class AccessibilityDataRecordDAO implements DAO<AccessibilityDataRecord> 
     public void update(AccessibilityDataRecord oldEntity, AccessibilityDataRecord newEntity) throws DAOException {
 
     }
+
 }
 

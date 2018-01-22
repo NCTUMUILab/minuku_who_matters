@@ -37,7 +37,7 @@ public class ConnectivityStreamGenerator extends AndroidStreamGenerator<Connecti
     private static boolean mIsConnected = false;
     private static boolean mIsWifiAvailable = false;
     private static boolean mIsMobileAvailable = false;
-    private static boolean mIsWifiConnected = false;
+    public static boolean mIsWifiConnected = false;
     private static boolean mIsMobileConnected = false;
 
     public static String mNetworkType = "NA";

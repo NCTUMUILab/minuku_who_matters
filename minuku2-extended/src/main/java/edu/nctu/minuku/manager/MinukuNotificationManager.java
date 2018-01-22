@@ -82,14 +82,14 @@ public class MinukuNotificationManager extends Service implements NotificationMa
                 PendingIntent.getService(this, 0, new Intent(this, MinukuNotificationManager.class), 0)
         );
 
-        Notification note  = new Notification.Builder(getBaseContext())
-                .setContentTitle(Constants.APP_NAME)
-                .setContentText(Constants.RUNNING_APP_DECLARATION)
-                .setSmallIcon(R.drawable.self_reflection)
-                .setAutoCancel(false)
-                .build();
-        note.flags |= Notification.FLAG_NO_CLEAR;
-        startForeground( 42, note );
+//        Notification note  = new Notification.Builder(getBaseContext())
+//                .setContentTitle(Constants.APP_NAME)
+//                .setContentText(Constants.RUNNING_APP_DECLARATION)
+//                .setSmallIcon(R.drawable.self_reflection)
+//                .setAutoCancel(false)
+//                .build();
+//        note.flags |= Notification.FLAG_NO_CLEAR;
+//        startForeground( 42, note );
 
         checkRegisteredNotifications();
 
@@ -131,8 +131,8 @@ public class MinukuNotificationManager extends Service implements NotificationMa
                          */
                         Log.d(TAG, "Alerting again " + notification.getTitle());
                         mNotificationManager.cancel(entry.getKey());
-                        mNotificationManager.notify(notificationID,
-                                buildNotificationForNotificationEvent(notification, entry.getKey()));
+//                        mNotificationManager.notify(notificationID,
+//                                buildNotificationForNotificationEvent(notification, entry.getKey()));
                         notification.incrementExpirationCount();
                         break;
                     case KEEP_SHOWING_WITHOUT_ALERT:
@@ -244,7 +244,7 @@ public class MinukuNotificationManager extends Service implements NotificationMa
         Notification n = buildNotificationForNotificationEvent(aShowNotificationEvent,
                 notificationID);
         registeredNotifications.put(notificationID, aShowNotificationEvent);
-        mNotificationManager.notify(notificationID, n);
+//        mNotificationManager.notify(notificationID, n);
     }
 
     @Subscribe

@@ -48,9 +48,13 @@ import javax.net.ssl.X509TrustManager;
 
 import edu.nctu.minuku.DBHelper.DBHelper;
 import edu.nctu.minuku.config.Constants;
+import edu.nctu.minuku.dao.AccessibilityDataRecordDAO;
 import edu.nctu.minuku.logger.Log;
 import edu.nctu.minuku.manager.DBManager;
-
+import edu.nctu.minuku.model.DataRecord.ActivityRecognitionDataRecord;
+import edu.nctu.minuku.streamgenerator.ConnectivityStreamGenerator;
+import edu.nctu.minuku.manager.MinukuDAOManager;
+import java.lang.Long;
 /**
  * Created by Lawrence on 2017/8/16.
  */
@@ -58,12 +62,13 @@ import edu.nctu.minuku.manager.DBManager;
 public class WifiReceiver extends BroadcastReceiver {
 
     private final String TAG = "WifiReceiver";
+    private Context mcontext;
 
-    private Handler mMainThread;
+    private Handler mDumpThread, mTripThread;
 
     private SharedPreferences sharedPrefs;
 
-    private Runnable runnable = null;
+    private Runnable runnable = null, trip_runnable = null;
 
     private int year,month,day,hour,min;
 
@@ -83,12 +88,14 @@ public class WifiReceiver extends BroadcastReceiver {
     private boolean noDataFlag6 = false;
     private boolean noDataFlag7 = false;
 
-    private static final String PACKAGE_DIRECTORY_PATH="/Android/data/edu.nctu.minuku_2/wifi/";
+    private static final String PACKAGE_DIRECTORY_PATH="/Android/data/edu.nctu.minuku_2/";
 
-    private static final String postDumpUrl = "";
+    private static final String postDumpUrl = "http://ec2-18-220-229-235.us-east-2.compute.amazonaws.com:8000/upload/";//&action=insert, search
+    private static final String postTripUrl = "http://192.168.10.93:5000/request?collection=trip";//&action=insert, search
 
-    public static int mainThreadUpdateFrequencyInSeconds = 10;
-    public static long mainThreadUpdateFrequencyInMilliseconds = mainThreadUpdateFrequencyInSeconds *Constants.MILLISECONDS_PER_SECOND;
+    public static int mainThreadUpdateFrequencyInSeconds =10;
+    public static long mainThreadUpdateFrequencyInMilliseconds = mainThreadUpdateFrequencyInSeconds * Constants.MILLISECONDS_PER_SECOND;
+
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -105,9 +112,9 @@ public class WifiReceiver extends BroadcastReceiver {
         int mMonth = cal.get(Calendar.MONTH)+1;
         int mDay = cal.get(Calendar.DAY_OF_MONTH);
 
-//        mDay++; //start the task tomorrow.
+        mDay++; //start the task tomorrow.
 
-        sharedPrefs = context.getSharedPreferences("edu.umich.minuku_2", context.MODE_PRIVATE);
+        sharedPrefs = context.getSharedPreferences("edu.nctu.minuku", context.MODE_PRIVATE);
 
         year = sharedPrefs.getInt("StartYear", mYear);
         month = sharedPrefs.getInt("StartMonth", mMonth);
@@ -125,25 +132,28 @@ public class WifiReceiver extends BroadcastReceiver {
             // connected to the internet
             if (activeNetwork.getType() == ConnectivityManager.TYPE_WIFI) {
                 // connected to wifi
-                Log.d(TAG,"Wifi activeNetwork");
+                Log.d(TAG,"INTERNETEVENT: Wifi activeNetwork");
 
                 //do the work here.
                 MakingJsonDumpDataMainThread();
+//                MakingJsonTripDataMainThread();
 
             } else if (activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE) {
                 //we might no need to use this.
                 // connected to the mobile provider's data plan
-                Log.d(TAG, "MOBILE activeNetwork" ) ;
+                Log.d(TAG, "INTERNETEVENT: MOBILE activeNetwork" ) ;
                 if(runnable!=null){
-//                    mMainThread.removeCallbacks(runnable);
+                    Log.d(TAG, "INTERNETEVENT: KILLTHREAD" ) ;
+                    mDumpThread.removeCallbacks(runnable);
 
                 }
             }
         } else {
             // not connected to the internet
-            Log.d(TAG, "no Network" ) ;
+            Log.d(TAG, "INTERNETEVENT: no Network" ) ;
             if(runnable!=null) {
-//                mMainThread.removeCallbacks(runnable);
+                Log.d(TAG, "INTERNETEVENT: KILLTHREAD" ) ;
+                mDumpThread.removeCallbacks(runnable);
             }
         }
 
@@ -153,101 +163,45 @@ public class WifiReceiver extends BroadcastReceiver {
 
         Log.d(TAG, "MakingJsonDumpDataMainThread") ;
 
-        mMainThread = new Handler();
+        mDumpThread = new Handler();
 
         runnable = new Runnable() {
-//            @Override
-//            protected void onPause() {
-//                mMainThread.removeCallbacks(runnable);
-//                super.onPause();
-//            }
-//
-//            @Override
-//            protected void onResume()
-//            {
-//                mMainThread.postDelayed(runnable, mainThreadUpdateFrequencyInMilliseconds);
-//                super.onResume();
-//            }
 
             @Override
             public void run() {
-
-                //TODO at official min should replaced by 0.
-//                Trip_startTime = getSpecialTimeInMillis(year,month,day,hour,min);
-                long startstartTime = getSpecialTimeInMillis(makingDataFormat(year,month,day,hour,min));
-                startTime = sharedPrefs.getLong("StartTime", startstartTime);
-//                Trip_startTime = sharedPrefs.getLong("Trip_startTime", getSpecialTimeInMillis(year,month,day,hour,min));
-//                Log.d(TAG,"Start : "+ getSpecialTimeInMillis(makingDataFormat(year,month,day,hour,min)));
-                Log.d(TAG,"Start year : "+ year+" month : "+ month+" day : "+ day+" hour : "+ hour+" min : "+ min);
-//                Log.d(TAG,"StartTime : " + getTimeString(getSpecialTimeInMillis(makingDataFormat(year,month,day,hour,min))));
-                Log.d(TAG,"StartTimeString : " + getTimeString(startTime));
-                Log.d(TAG,"StartTime : " + startTime);
-
-                long startendTime = getSpecialTimeInMillis(makingDataFormat(year,month,day,hour+1,min));
-                endTime = sharedPrefs.getLong("EndTime", startendTime);
-//                Trip_endTime = sharedPrefs.getLong("Trip_endTime", getSpecialTimeInMillis(year,month,day,hour,min+10));
-                Log.d(TAG,"End year : "+ year+" month : "+ month+" day : "+ day+" hour+1 : "+ (hour+1)+" min : "+ min);
-                Log.d(TAG,"EndTimeString : " + getTimeString(endTime));
-                Log.d(TAG,"EndTime : " + endTime);
-
-                nowTime = new Date().getTime();//getCurrentTimeInMillis();//
-                Log.d(TAG,"NowTimeString : " + getTimeString(nowTime));
-                Log.d(TAG,"NowTime : " + nowTime);
-
-                if(nowTime > endTime) {
+                Log.d(TAG, "MakingJsonDumpDataMainThread!!") ;
+                if(ConnectivityStreamGenerator.mIsWifiConnected) {
+                    Log.d(TAG, "MakingJsonDumpDataMainThread-wifi") ;
                     MakingJsonDumpData();
-                    //setting nextime interval
-                    latestUpdatedTime = endTime;
-                    startTime = latestUpdatedTime;
-
-//                    long nextinterval = getSpecialTimeInMillis(makingDataFormat(0,0,0,0,5));
-                    long nextinterval = 1 * 60 * 60000; //1 hr
-
-                    endTime = startTime + nextinterval;//getSpecialTimeInMillis(0,0,0,0,10);
-
-                    Log.d(TAG,"latestUpdatedTime : " + latestUpdatedTime);
-                    Log.d(TAG,"latestUpdatedTime + 1 hour : " + latestUpdatedTime+ nextinterval);
-
-                    sharedPrefs.edit().putLong("StartTime", startTime).apply();
-                    sharedPrefs.edit().putLong("EndTime", endTime).apply();
                 }
 
-//                hour++;
-//                if(hour>24)
-//                    hour %= 24;
 
-//                sharedPrefs.edit().putInt("StartHour", hour).apply();
-
-//                MakingJsonDumpData();
-
-                mMainThread.postDelayed(this, mainThreadUpdateFrequencyInMilliseconds);
+                mDumpThread.postDelayed(this, mainThreadUpdateFrequencyInMilliseconds);
 
             }
         };
 
-        mMainThread.post(runnable);
+        mDumpThread.post(runnable);
     }
 
     public void MakingJsonDumpData(){
 
         Log.d(TAG, "MakingJsonDumpData");
+        if(!getOldestDataTime()){
+            return;
+        }
 
         JSONObject data = new JSONObject();
 
         try {
-            data.put("user_id", Constants.USER_ID);
-            data.put("group_number", Constants.GROUP_NUM);
+
             data.put("device_id", Constants.DEVICE_ID);
 
-//            data.put("type", "Transportation");
 
-//            long Trip_startTime = getSpecialTimeInMillis(year,month,day,hour);
-//            long Trip_endTime = getSpecialTimeInMillis(year,month,day,hour+1);
-
-            data.put("start", String.valueOf(startTime));
-            data.put("end", String.valueOf(endTime));
-            data.put("Trip_startTime", getTimeString(startTime));
-            data.put("Trip_endTime", getTimeString(endTime));
+            data.put("startTime", String.valueOf(startTime));
+            data.put("endTime", String.valueOf(endTime));
+            data.put("startTimeString", getTimeString(startTime));
+            data.put("endTimeString", getTimeString(endTime));
         }catch (JSONException e){
             e.printStackTrace();
         }
@@ -259,25 +213,13 @@ public class WifiReceiver extends BroadcastReceiver {
         storeConnectivity(data);
         storeBattery(data);
         storeAppUsage(data);
-        storeAccessibility(data);
-        storeSensor(data);
-        storeTelephony(data);
 
+        //storeTelephony(data);
+        //storeSensor(data);
+        //storeAccessibility(data);
 
         Log.d(TAG,"final data : "+ data.toString());
 
-        //TODO check there have Data or not store in external
-//        if(noDataFlag1 && noDataFlag2 && noDataFlag3 && noDataFlag4 && noDataFlag5 && noDataFlag6 && noDataFlag7) {
-            storeToLocalFolder(data);
-        /*
-            noDataFlag1 = false;
-            noDataFlag2 = false;
-            noDataFlag3 = false;
-            noDataFlag4 = false;
-            noDataFlag5 = false;
-            noDataFlag6 = false;
-            noDataFlag7 = false;
-        }*/
 
         String curr =  getDateCurrentTimeZone(new Date().getTime());
 
@@ -289,10 +231,10 @@ public class WifiReceiver extends BroadcastReceiver {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
                 new HttpAsyncPostJsonTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR,
-                    postDumpUrl,
-                    data.toString(),
-                    "Dump",
-                    curr).get();
+                        postDumpUrl,
+                        data.toString(),
+                        "Dump",
+                        curr).get();
             else
                 new HttpAsyncPostJsonTask().execute(
                         postDumpUrl,
@@ -305,6 +247,45 @@ public class WifiReceiver extends BroadcastReceiver {
         } catch (ExecutionException e) {
             e.printStackTrace();
         }
+
+    }
+
+    public void MakingJsonTripDataMainThread(){
+        mTripThread = new Handler();
+
+        trip_runnable = new Runnable() {
+
+            @Override
+            public void run() {
+
+                JSONObject data = storeTrip();
+                String curr =  getDateCurrentTimeZone(new Date().getTime());
+
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+                        new HttpAsyncPostJsonTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR,
+                                postTripUrl,
+                                data.toString(),
+                                "Trip",
+                                curr).get();
+                    else
+                        new HttpAsyncPostJsonTask().execute(
+                                postTripUrl,
+                                data.toString(),
+                                "Trip",
+                                curr).get();
+
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (ExecutionException e) {
+                    e.printStackTrace();
+                }
+
+                mTripThread.postDelayed(this, mainThreadUpdateFrequencyInMilliseconds);
+            }
+        };
+
+        mTripThread.post(trip_runnable);
 
     }
 
@@ -393,6 +374,26 @@ public class WifiReceiver extends BroadcastReceiver {
             Log.d(TAG, "[postJSON] the result response code is " + responseCode);
             Log.d(TAG, "[postJSON] the result is " + result);
 
+            try {
+                JSONObject obj = new JSONObject(result);
+                Long r_startTime = obj.getLong("startTime");
+                Long r_endTime = obj.getLong("endTime");
+
+            deleteTransporatation(r_startTime, r_endTime);
+            deleteLocation(r_startTime, r_endTime);
+            deleteActivityRecognition(r_startTime, r_endTime);
+            deleteRinger(r_startTime, r_endTime);
+            deleteConnectivity(r_startTime, r_endTime);
+            deleteBattery(r_startTime, r_endTime);
+            deleteAppUsage(r_startTime, r_endTime);
+
+            }catch (JSONException e){
+
+            }
+
+
+
+
         }
         catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
@@ -467,6 +468,106 @@ public class WifiReceiver extends BroadcastReceiver {
         }
     }
 
+    private Boolean getOldestDataTime(){
+        Log.d(TAG, "getOldestDataTime");
+        Long minDateTime = (long) 0;
+        String v;
+        Long i;
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        try {
+            Cursor c = db.rawQuery("SELECT "+ DBHelper.TIME +" FROM "+ DBHelper.ringer_table + " LIMIT 1", null);
+            c.moveToFirst();
+            v = c.getString(0);
+            i = Long.parseLong(v);
+        } catch (Exception e){
+            return Boolean.FALSE;
+        }
+
+        if (System.currentTimeMillis() - i > 60 * 60 * 1000){
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTimeInMillis(i);
+            Log.d(TAG, "before: "+  String.valueOf(calendar.getTimeInMillis()));
+//            calendar.set(Calendar.MINUTE, 0);
+            Log.d(TAG, "after: "+  String.valueOf(calendar.getTimeInMillis()));
+
+            startTime = calendar.getTimeInMillis();
+            endTime = calendar.getTimeInMillis()+(20 * 60 * 1000);
+            return Boolean.TRUE;
+        }
+        else{
+            Log.d(TAG, "getOldestDataTime in one hour");
+            return Boolean.FALSE;
+        }
+    }
+
+    private JSONObject storeTrip(){
+
+        Log.d(TAG, "storeTrip");
+
+        JSONObject tripJson = new JSONObject();
+
+        try {
+
+            SQLiteDatabase db = DBManager.getInstance().openDatabase();
+            Cursor tripCursor = db.rawQuery("SELECT * FROM "+DBHelper.annotate_table, null); //cause pos start from 0.
+            Log.d(TAG,"SELECT * FROM "+DBHelper.annotate_table); //+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' "
+
+            int rows = tripCursor.getCount();
+
+            Log.d(TAG, "rows : "+rows);
+
+            if(rows!=0){
+                tripCursor.moveToFirst();
+                for(int i=0;i<rows;i++) {
+
+                    String _id = tripCursor.getString(0);
+
+                    JSONObject dataJson = new JSONObject();
+
+                    String startTime = tripCursor.getString(1);
+                    String endTime = tripCursor.getString(2);
+                    String startTimeString = tripCursor.getString(3);
+                    String endTimeString = tripCursor.getString(4);
+                    String sessionid = tripCursor.getString(5);
+
+                    JSONObject annotation_Json = new JSONObject();
+
+                    String activity = tripCursor.getString(6);
+                    String annotation_Goal = tripCursor.getString(7);
+                    String annotation_SpecialEvent = tripCursor.getString(8);
+
+                    Log.d(TAG,"_id : "+_id+" startTime : "+startTime+" endTime : "+endTime+" sessionid : "+sessionid);
+                    Log.d(TAG,"activity : "+activity+" annotation_Goal : "+annotation_Goal+" annotation_SpecialEvent : "+annotation_SpecialEvent);
+
+                    annotation_Json.put("activity", activity);
+                    annotation_Json.put("annotation_Goal", annotation_Goal);
+                    annotation_Json.put("annotation_SpecialEvent", annotation_SpecialEvent);
+
+                    dataJson.put("startTime", startTime);
+                    dataJson.put("endTime", endTime);
+                    dataJson.put("startTimeString", startTimeString);
+                    dataJson.put("endTimeString", endTimeString);
+                    dataJson.put("sessionid", sessionid);
+                    dataJson.put("annotation", annotation_Json);
+
+                    tripJson.put(_id, dataJson);
+
+                    tripCursor.moveToNext();
+                }
+
+                Log.d(TAG,"tripJson : "+ tripJson.toString());
+
+            }
+
+        }catch (JSONException e){
+            e.printStackTrace();
+        }catch(NullPointerException e){
+            e.printStackTrace();
+        }
+
+        return tripJson;
+    }
+
     private void storeTransporatation(JSONObject data){
 
         Log.d(TAG, "storeTransporatation");
@@ -517,6 +618,14 @@ public class WifiReceiver extends BroadcastReceiver {
         Log.d(TAG,"data : "+ data.toString());
 
     }
+
+    private void deleteTransporatation(Long startTime, Long endTime) {
+        Log.d(TAG, "deleteTransporatation");
+        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        db.delete(DBHelper.transportationMode_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
+    }
+
 
     private void storeLocation(JSONObject data){
 
@@ -577,6 +686,13 @@ public class WifiReceiver extends BroadcastReceiver {
 
     }
 
+    private void deleteLocation(Long startTime, Long endTime) {
+        Log.d(TAG, "deleteLocation");
+        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        db.delete(DBHelper.location_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
+    }
+
     private void storeActivityRecognition(JSONObject data){
 
         Log.d(TAG, "storeActivityRecognition");
@@ -630,6 +746,13 @@ public class WifiReceiver extends BroadcastReceiver {
 
         Log.d(TAG,"data : "+ data.toString());
 
+    }
+
+    private void deleteActivityRecognition(Long startTime, Long endTime) {
+        Log.d(TAG, "deleteActivityRecognition");
+        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        db.delete(DBHelper.activityRecognition_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
 
     private void storeRinger(JSONObject data){
@@ -710,6 +833,13 @@ public class WifiReceiver extends BroadcastReceiver {
 
     }
 
+    private void deleteRinger(Long startTime, Long endTime) {
+        Log.d(TAG, "deleteRinger");
+        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        db.delete(DBHelper.ringer_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
+    }
+
     private void storeConnectivity(JSONObject data){
 
         Log.d(TAG, "storeConnectivity");
@@ -788,6 +918,13 @@ public class WifiReceiver extends BroadcastReceiver {
 
     }
 
+    private void deleteConnectivity(Long startTime, Long endTime) {
+        Log.d(TAG, "deleteConnectivity");
+        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        db.delete(DBHelper.connectivity_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
+    }
+
     private void storeBattery(JSONObject data){
 
         Log.d(TAG, "storeBattery");
@@ -852,246 +989,11 @@ public class WifiReceiver extends BroadcastReceiver {
 
     }
 
-    private void storeAccessibility(JSONObject data){
-        Log.d(TAG, "storeAccessibility");
-
-        try {
-
-            JSONObject appUsageAndtimestampsJson = new JSONObject();
-
-            JSONArray actionType = new JSONArray();
-//            JSONArray Latest_Used_Apps = new JSONArray();
-//            JSONArray Latest_Foreground_Activitys = new JSONArray();
-            JSONArray timestamps = new JSONArray();
-
-            SQLiteDatabase db = DBManager.getInstance().openDatabase();
-            Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.accessibility_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.accessibility_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
-
-            int rows = transCursor.getCount();
-
-            Log.d(TAG, "rows : "+rows);
-
-            if(rows!=0){
-                transCursor.moveToFirst();
-                for(int i=0;i<rows;i++) {
-                    String timestamp = transCursor.getString(1);
-                    String type = transCursor.getString(4);
-
-                    actionType.put(type);
-                    timestamps.put(timestamp);
-
-                    transCursor.moveToNext();
-                }
-
-                appUsageAndtimestampsJson.put("actionType",actionType);
-//                appUsageAndtimestampsJson.put("Latest_Used_App",Latest_Used_Apps);
-////                appUsageAndtimestampsJson.put("Latest_Foreground_Activity",Latest_Foreground_Activitys);
-                appUsageAndtimestampsJson.put("timestamps",timestamps);
-
-                data.put("Accessibility",appUsageAndtimestampsJson);
-
-            }else
-                noDataFlag7 = true;
-
-        }catch (JSONException e){
-            e.printStackTrace();
-        }catch(NullPointerException e){
-            e.printStackTrace();
-        }
-
-        Log.d(TAG,"data : "+ data.toString());
-    }
-
-    private void storeTelephony(JSONObject data){
-        Log.d(TAG, "storeTelephony");
-
-        try {
-
-            JSONObject telephonyAndtimestampsJson = new JSONObject();
-
-            JSONArray networkOperatorNames = new JSONArray();
-            JSONArray callStates = new JSONArray();
-            JSONArray phoneSignalTypes = new JSONArray();
-
-            JSONObject general_signal_strength = new JSONObject();
-
-            JSONArray gsmSignalStrengths = new JSONArray();
-            JSONArray LTESignalStrengths = new JSONArray();
-            JSONArray cdmaSignalStrenthLevels = new JSONArray();
-
-            JSONArray timestamps = new JSONArray();
-
-            SQLiteDatabase db = DBManager.getInstance().openDatabase();
-            Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.telephony_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.telephony_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
-
-            int rows = transCursor.getCount();
-
-            Log.d(TAG, "rows : "+rows);
-
-            if(rows!=0){
-                transCursor.moveToFirst();
-                for(int i=0;i<rows;i++) {
-                    String timestamp = transCursor.getString(1);
-                    String networkOperatorName = transCursor.getString(2);
-                    String callState = transCursor.getString(3);
-                    String phoneSignalType = transCursor.getString(4);
-
-                    String gsmSignalStrength = transCursor.getString(5);
-                    String LTESignalStrength = transCursor.getString(6);
-                    String cdmaSignalStrenthLevel = transCursor.getString(7);
-
-                    Log.d(TAG,"timestamp : "+timestamp+" networkOperatorName : "+networkOperatorName+" callState : "+callState+" phoneSignalType : "+phoneSignalType);
-
-                    networkOperatorNames.put(networkOperatorName);
-                    callStates.put(callState);
-                    phoneSignalTypes.put(phoneSignalType);
-
-                    gsmSignalStrengths.put(gsmSignalStrength);
-                    LTESignalStrengths.put(LTESignalStrength);
-                    cdmaSignalStrenthLevels.put(cdmaSignalStrenthLevel);
-
-                    timestamps.put(timestamp);
-
-                    transCursor.moveToNext();
-                }
-
-                general_signal_strength.put("GsmSignalStrength",gsmSignalStrengths);
-                general_signal_strength.put("LTESignalStrength",LTESignalStrengths);
-                general_signal_strength.put("CdmaSignalStrenthLevel",cdmaSignalStrenthLevels);
-
-                telephonyAndtimestampsJson.put("NetworkOperatorNames",networkOperatorNames);
-                telephonyAndtimestampsJson.put("CallStates",callStates);
-                telephonyAndtimestampsJson.put("PhoneSignalType",phoneSignalTypes);
-                telephonyAndtimestampsJson.put("General_signal_strength", general_signal_strength);
-
-                telephonyAndtimestampsJson.put("timestamps",timestamps);
-
-                data.put("Telephony",telephonyAndtimestampsJson);
-
-            }else
-                noDataFlag7 = true;
-
-        }catch (JSONException e){
-            e.printStackTrace();
-        }catch(NullPointerException e){
-            e.printStackTrace();
-        }
-
-        Log.d(TAG,"data : "+ data.toString());
-
-    }
-
-    private void storeSensor(JSONObject data){
-        Log.d(TAG, "storeSensor");
-
-        try {
-
-            JSONObject sensorAndtimestampsJson = new JSONObject();
-
-            JSONObject position = new JSONObject();
-
-            JSONArray magnetic_fields = new JSONArray();
-            JSONArray proximitys = new JSONArray();
-
-            JSONObject environment = new JSONObject();
-
-            JSONArray ambient_temperatures = new JSONArray();
-            JSONArray lights = new JSONArray();
-            JSONArray pressures = new JSONArray();
-            JSONArray relative_humiditys = new JSONArray();
-            JSONArray temperatures = new JSONArray();
-            JSONArray humiditys = new JSONArray();
-
-            JSONObject motion = new JSONObject();
-
-            JSONArray accelerometers = new JSONArray();
-            JSONArray gravitys = new JSONArray();
-            JSONArray gyroscopes = new JSONArray();
-            JSONArray linear_accelerations = new JSONArray();
-            JSONArray rotation_vectors = new JSONArray();
-            JSONArray step_counters = new JSONArray();
-            JSONArray step_detections = new JSONArray();
-
-            JSONArray timestamps = new JSONArray();
-
-            SQLiteDatabase db = DBManager.getInstance().openDatabase();
-            Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
-
-            int rows = transCursor.getCount();
-
-            Log.d(TAG, "rows : "+rows);
-
-            if(rows!=0){
-                transCursor.moveToFirst();
-                for(int i=0;i<rows;i++) {
-                    String timestamp = transCursor.getString(1);
-                    String accelerometer = transCursor.getString(2);
-                    String gyroscope = transCursor.getString(3);
-                    String gravity = transCursor.getString(4);
-                    String linear_acceleration = transCursor.getString(5);
-                    String rotation_vector = transCursor.getString(6);
-                    String proximity = transCursor.getString(7);
-                    String magnetic_field = transCursor.getString(8);
-                    String light = transCursor.getString(9);
-                    String pressure = transCursor.getString(10);
-                    String relative_humidity = transCursor.getString(11);
-                    String ambient_temperature = transCursor.getString(12);
-
-
-                    Log.d(TAG,"timestamp : "+timestamp+" networkOperatorName : "+accelerometer+" callState : "+gyroscope+" phoneSignalType : "+gravity);
-
-                    accelerometers.put(accelerometer);
-                    gyroscopes.put(gyroscope);
-                    gravitys.put(gravity);
-                    linear_accelerations.put(linear_acceleration);
-                    rotation_vectors.put(rotation_vector);
-                    proximitys.put(proximity);
-                    magnetic_fields.put(magnetic_field);
-                    lights.put(light);
-                    pressures.put(pressure);
-                    relative_humiditys.put(relative_humidity);
-                    ambient_temperatures.put(ambient_temperature);
-
-                    timestamps.put(timestamp);
-
-                    transCursor.moveToNext();
-                }
-
-                position.put("Magnetic_field",magnetic_fields);
-                position.put("Proximity",proximitys);
-
-                environment.put("Ambient_temperature",ambient_temperatures);
-                environment.put("Light",lights);
-                environment.put("Pressure",pressures);
-                environment.put("Relative_humiditys",relative_humiditys);
-
-                motion.put("Accelerometer",accelerometers);
-                motion.put("Gravity",gravitys);
-                motion.put("Gyroscopes",gyroscopes);
-                motion.put("Linear_acceleration", linear_accelerations);
-                motion.put("Rotation_vector",rotation_vectors);
-
-                sensorAndtimestampsJson.put("Position", position);
-                sensorAndtimestampsJson.put("Environment", environment);
-                sensorAndtimestampsJson.put("Motion", motion);
-
-                sensorAndtimestampsJson.put("timestamps",timestamps);
-
-                data.put("Sensor",sensorAndtimestampsJson);
-
-            }else
-                noDataFlag7 = true;
-
-        }catch (JSONException e){
-            e.printStackTrace();
-        }catch(NullPointerException e){
-            e.printStackTrace();
-        }
-
-        Log.d(TAG,"data : "+ data.toString());
+    private void deleteBattery(Long startTime, Long endTime) {
+        Log.d(TAG, "deleteBattery");
+        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        db.delete(DBHelper.battery_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
 
     private void storeAppUsage(JSONObject data){
@@ -1151,6 +1053,13 @@ public class WifiReceiver extends BroadcastReceiver {
 
         Log.d(TAG,"data : "+ data.toString());
 
+    }
+
+    private void deleteAppUsage(Long startTime, Long endTime) {
+        Log.d(TAG, "deleteAppUsage");
+        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        db.delete(DBHelper.appUsage_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
 
     private long getSpecialTimeInMillis(String givenDateFormat){

@@ -132,6 +132,14 @@ public class DBHelper extends SQLiteOpenHelper {
     public static final String RELATIVE_HUMIDITY_col = "RELATIVE_HUMIDITY";
     public static final String AMBIENT_TEMPERATURE_col = "AMBIENT_TEMPERATURE";
 
+    //notification name
+    public static final String title_col = "title";
+    public static final String n_text_col = "text";
+    public static final String subText_col = "subText";
+    public static final String tickerText_col = "tickerText";
+    public static final String app_col = "app";
+    public static final String sendForm_col = "sendForm";
+
     //table name
     public static final String location_table = "Location";
     public static final String activityRecognition_table = "ActivityRecognition";
@@ -145,6 +153,9 @@ public class DBHelper extends SQLiteOpenHelper {
     public static final String telephony_table = "Telephony";
     public static final String accessibility_table = "Accessibility";
     public static final String sensor_table = "Sensor";
+    public static final String notification_table = "Notification";
+
+
 
 
     public static final String DATABASE_NAME = "MySQLite.db";
@@ -181,6 +192,7 @@ public class DBHelper extends SQLiteOpenHelper {
         createTelephonyTable(db);
         createAccessibilityTable(db);
         createSensorTable(db);
+        createNotificationTable(db);
     }
 
 
@@ -191,6 +203,26 @@ public class DBHelper extends SQLiteOpenHelper {
 
     public void initiateDBManager() {
         DBManager.initializeInstance(this);
+    }
+
+    public void createNotificationTable(SQLiteDatabase db){
+        Log.d(TAG,"create Notification table");
+
+        String cmd = "CREATE TABLE " +
+                notification_table + "(" +
+                id+" INTEGER PRIMARY KEY NOT NULL, " +
+                TIME + " TEXT NOT NULL, " +
+                title_col+" TEXT, " +
+                n_text_col+" TEXT, " +
+                subText_col+" TEXT, " +
+                tickerText_col+" TEXT, " +
+                app_col+" TEXT, " +
+                sendForm_col+ " BOOLEAN" +
+                ");";
+
+        Log.d(TAG,"create Notification table" + cmd);
+
+        db.execSQL(cmd);
     }
 
     public void createTransportationModeTable(SQLiteDatabase db){

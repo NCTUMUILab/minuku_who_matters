@@ -83,7 +83,7 @@ public class QuestionnaireManager {
         note.setContentIntent(pending);
 
         // using the same tag and Id causes the new notification to replace an existing one
-        mNotificationManager.notify(String.valueOf(System.currentTimeMillis()), 0, note.build());
+//        mNotificationManager.notify(String.valueOf(System.currentTimeMillis()), 0, note.build());
 
     }
 

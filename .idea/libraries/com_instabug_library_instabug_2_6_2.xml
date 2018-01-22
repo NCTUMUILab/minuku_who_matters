@@ -1,8 +1,8 @@
 <component name="libraryTable">
   <library name="com.instabug.library:instabug-2.6.2">
     <CLASSES>
-      <root url="jar://$USER_HOME$/.gradle/caches/transforms-1/files-1.1/instabug-2.6.2.aar/fe48eb49a6bc148d14e56ce0bf58ec0d/jars/classes.jar!/" />
-      <root url="file://$USER_HOME$/.gradle/caches/transforms-1/files-1.1/instabug-2.6.2.aar/fe48eb49a6bc148d14e56ce0bf58ec0d/res" />
+      <root url="jar://$USER_HOME$/.gradle/caches/transforms-1/files-1.1/instabug-2.6.2.aar/35c23621d5fa760f7387f18ba328c2ae/jars/classes.jar!/" />
+      <root url="file://$USER_HOME$/.gradle/caches/transforms-1/files-1.1/instabug-2.6.2.aar/35c23621d5fa760f7387f18ba328c2ae/res" />
     </CLASSES>
     <JAVADOC />
     <SOURCES>

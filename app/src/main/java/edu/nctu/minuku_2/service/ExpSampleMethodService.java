@@ -126,8 +126,8 @@ public class ExpSampleMethodService extends Service {
                     .setAutoCancel(true)
                     .build();
 
-            mNotificationManager.notify(check_notifyID, note);
-            note.flags = Notification.FLAG_AUTO_CANCEL;
+//            mNotificationManager.notify(check_notifyID, note);
+//            note.flags = Notification.FLAG_AUTO_CANCEL;
         }catch(Exception e){
             e.printStackTrace();
         }
@@ -158,7 +158,7 @@ public class ExpSampleMethodService extends Service {
                 .build();
 
         // using the same tag and Id causes the new notification to replace an existing one
-        mNotificationManager.notify(esm_notifyID, note); //String.valueOf(System.currentTimeMillis()),
+//        mNotificationManager.notify(esm_notifyID, note); //String.valueOf(System.currentTimeMillis()),
         note.flags = Notification.FLAG_AUTO_CANCEL;
     }
 

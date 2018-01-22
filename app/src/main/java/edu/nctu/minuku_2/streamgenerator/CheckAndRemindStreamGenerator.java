@@ -183,7 +183,7 @@ public class CheckAndRemindStreamGenerator extends AndroidStreamGenerator<CheckA
         //startForeground( 42, note );
 
         // using the same tag and Id causes the new notification to replace an existing one
-        mNotificationManager.notify(car_notifyID, note); //String.valueOf(System.currentTimeMillis()),
+//        mNotificationManager.notify(car_notifyID, note); //String.valueOf(System.currentTimeMillis()),
         note.flags = Notification.FLAG_AUTO_CANCEL;
     }
 

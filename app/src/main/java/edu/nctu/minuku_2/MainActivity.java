@@ -61,6 +61,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import android.text.TextUtils;
 
 import edu.nctu.minuku.config.Constants;
 import edu.nctu.minuku.event.DecrementLoadingProcessCountEvent;
@@ -68,18 +69,38 @@ import edu.nctu.minuku.event.IncrementLoadingProcessCountEvent;
 import edu.nctu.minuku.logger.Log;
 import edu.nctu.minuku_2.NearbyPlaces.GetNearbyPlacesData;
 import edu.nctu.minuku_2.NearbyPlaces.GetUrl;
+import edu.nctu.minuku_2.Receiver.WifiReceiver;
 import edu.nctu.minuku_2.controller.Timeline;
 import edu.nctu.minuku_2.controller.report;
 import edu.nctu.minuku_2.controller.timer_move;
 import edu.nctu.minuku_2.service.BackgroundService;
 import edu.nctu.minuku_2.service.CheckpointAndReminderService;
+import edu.nctu.minuku_2.service.NotificationListener;
+
+import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.provider.Settings;
+import android.support.v7.app.AppCompatActivity;
+import android.os.Bundle;
+
+
+
 
 public class MainActivity extends AppCompatActivity {
+    final static String CONNECTIVITY_ACTION = "android.net.conn.CONNECTIVITY_CHANGE";
 
     private static final String TAG = "MainActivity";
     //private TextView compensationMessage;
     private AtomicInteger loadingProcessCount = new AtomicInteger(0);
     private ProgressDialog loadingProgressDialog;
+
+    WifiReceiver mWifiReceiver;
+    IntentFilter intentFilter;
 
     private int mYear, mMonth, mDay;
 
@@ -111,12 +132,33 @@ public class MainActivity extends AppCompatActivity {
     private ScheduledExecutorService mScheduledExecutorService;
     public static final int REFRESH_FREQUENCY = 15; //10s, 10000ms
     public static final int BACKGROUND_RECORDING_INITIAL_DELAY = 0;
+    private AlertDialog enableNotificationListenerAlertDialog;
+
+    private static final String ENABLED_NOTIFICATION_LISTENERS = "enabled_notification_listeners";
+    private static final String ACTION_NOTIFICATION_LISTENER_SETTINGS = "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS";
+
     //private UserSubmissionStats mUserSubmissionStats;
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        registerReceiver(mWifiReceiver, intentFilter);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        unregisterReceiver(mWifiReceiver);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "Creating Main activity");
+
+        intentFilter = new IntentFilter();
+        intentFilter.addAction(CONNECTIVITY_ACTION);
+        mWifiReceiver = new WifiReceiver();
 
         //compensationMessage = (TextView) findViewById(R.id.compensation_message);
 
@@ -152,8 +194,19 @@ public class MainActivity extends AppCompatActivity {
             sharedPrefs.edit().putBoolean("firstTimeToShowDialogOrNot", firstTimeToShowDialogOrNot).apply();
         }
 
+        toggleNotificationListenerService();
+        if(!isNotificationServiceEnabled()) {
+            Log.d(TAG, "notification start!!");
+            enableNotificationListenerAlertDialog = buildNotificationServiceAlertDialog();
+            enableNotificationListenerAlertDialog.show();
+        }
+
+
+
+
 
         startService(new Intent(getBaseContext(), BackgroundService.class));
+        startService(new Intent(getBaseContext(), NotificationListener.class));
 //        startService(new Intent(getBaseContext(), ExpSampleMethodService.class));
         startService(new Intent(getBaseContext(), CheckpointAndReminderService.class));
 
@@ -167,14 +220,62 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        Object dataTransfer[] = new Object[1];
+//        Object dataTransfer[] = new Object[1];
 
-        GetNearbyPlacesData getNearbyPlacesData = new GetNearbyPlacesData();
-        String url = GetUrl.getUrl(121.0006081,24.7856825);
-        dataTransfer[0] = url;
-
-        getNearbyPlacesData.execute(dataTransfer);
+//        GetNearbyPlacesData getNearbyPlacesData = new GetNearbyPlacesData();
+//        String url = GetUrl.getUrl(121.0006081,24.7856825);
+//        dataTransfer[0] = url;
+//
+//        getNearbyPlacesData.execute(dataTransfer);
     }
+
+    private boolean isNotificationServiceEnabled(){
+        String pkgName = getPackageName();
+        final String flat = Settings.Secure.getString(getContentResolver(),
+                ENABLED_NOTIFICATION_LISTENERS);
+        if (!TextUtils.isEmpty(flat)) {
+            final String[] names = flat.split(":");
+            for (int i = 0; i < names.length; i++) {
+                final ComponentName cn = ComponentName.unflattenFromString(names[i]);
+                if (cn != null) {
+                    if (TextUtils.equals(pkgName, cn.getPackageName())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private void toggleNotificationListenerService() {
+        Log.d("FFF", "toggleNotificationListenerService");
+        PackageManager pm = getPackageManager();
+        pm.setComponentEnabledSetting(new ComponentName(this, edu.nctu.minuku_2.service.NotificationListener.class),
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
+        pm.setComponentEnabledSetting(new ComponentName(this, edu.nctu.minuku_2.service.NotificationListener.class),
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP);
+    }
+
+    private AlertDialog buildNotificationServiceAlertDialog(){
+        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(this);
+        alertDialogBuilder.setTitle("start notification");
+        alertDialogBuilder.setMessage("gogogo");
+        alertDialogBuilder.setPositiveButton("yes",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        startActivity(new Intent(ACTION_NOTIFICATION_LISTENER_SETTINGS));
+                    }
+                });
+        alertDialogBuilder.setNegativeButton("no",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        // If you choose to not enable the notification listener
+                        // the app. will not work as expected
+                    }
+                });
+        return(alertDialogBuilder.create());
+    }
+
 
 
     private Button.OnClickListener doClick = new Button.OnClickListener() {

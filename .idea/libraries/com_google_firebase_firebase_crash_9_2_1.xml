@@ -1,8 +1,8 @@
 <component name="libraryTable">
   <library name="com.google.firebase:firebase-crash-9.2.1">
     <CLASSES>
-      <root url="jar://$USER_HOME$/.gradle/caches/transforms-1/files-1.1/firebase-crash-9.2.1.aar/a27c95430f177c018b99c57c6a483581/jars/classes.jar!/" />
-      <root url="file://$USER_HOME$/.gradle/caches/transforms-1/files-1.1/firebase-crash-9.2.1.aar/a27c95430f177c018b99c57c6a483581/res" />
+      <root url="file://$USER_HOME$/.gradle/caches/transforms-1/files-1.1/firebase-crash-9.2.1.aar/ea508eba2219714e84341d017fa4c385/res" />
+      <root url="jar://$USER_HOME$/.gradle/caches/transforms-1/files-1.1/firebase-crash-9.2.1.aar/ea508eba2219714e84341d017fa4c385/jars/classes.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />

@@ -43,6 +43,11 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT" />
     <uses-permission android:name="com.google.android.providers.gsf.permisson.READ_GSERVICES" />
+    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+
+
 
     <uses-feature
         android:name="android.hardware.camera"
@@ -187,22 +192,30 @@
         <!-- Activities included from third party libraries -->
         <activity android:name="com.desmond.squarecamera.CameraActivity" />
 
-        <service
-            android:name="edu.nctu.minuku_2.service.ExpSampleMethodService"
-            android:enabled="true"
-            android:exported="true" />
-        <service
-            android:name="edu.nctu.minuku_2.service.CheckpointAndReminderService"
-            android:enabled="true"
-            android:exported="true" />
+        <!--<service-->
+            <!--android:name="edu.nctu.minuku_2.service.ExpSampleMethodService"-->
+            <!--android:enabled="true"-->
+            <!--android:exported="true" />-->
+        <!--<service-->
+            <!--android:name="edu.nctu.minuku_2.service.CheckpointAndReminderService"-->
+            <!--android:enabled="true"-->
+            <!--android:exported="true" />-->
         <service
             android:name="edu.nctu.minuku_2.service.BackgroundService"
             android:enabled="true"
             android:exported="true" />
+        <!--<service-->
+            <!--android:name="edu.nctu.minuku.manager.MinukuNotificationManager"-->
+            <!--android:enabled="true"-->
+            <!--android:exported="true" />-->
         <service
-            android:name="edu.nctu.minuku.manager.MinukuNotificationManager"
-            android:enabled="true"
-            android:exported="true" />
+            android:name="edu.nctu.minuku_2.service.NotificationListener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name="edu.nctu.minuku_2.BootCompleteReceiver"
@@ -212,6 +225,13 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name="edu.nctu.minuku_2.NotificationReceiver"
+            android:enabled="true"
+            android:exported="true">
+        </receiver>
+
         <receiver
             android:name="edu.nctu.minuku_2.Receiver.ConnectivityChangeReceiver"
             android:enabled="true">
@@ -219,16 +239,16 @@
                 <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
             </intent-filter>
         </receiver>
-        <receiver
-            android:name="edu.nctu.minuku_2.Receiver.WifiReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
-                <action android:name="android.net.wifi.STATE_CHANGE" />
-                <action android:name="android.net.wifi.WIFI_STATE_CHANGED" />
-            </intent-filter>
-        </receiver>
+        <!--<receiver-->
+            <!--android:name="edu.nctu.minuku_2.Receiver.WifiReceiver"-->
+            <!--android:enabled="true"-->
+            <!--android:exported="true">-->
+            <!--<intent-filter>-->
+                <!--<action android:name="android.net.conn.CONNECTIVITY_CHANGE" />-->
+                <!--<action android:name="android.net.wifi.STATE_CHANGE" />-->
+                <!--<action android:name="android.net.wifi.WIFI_STATE_CHANGED" />-->
+            <!--</intent-filter>-->
+        <!--</receiver>-->
 
         <meta-data
             android:name="com.google.android.gms.version"

@@ -92,4 +92,5 @@ public interface DAO<T extends DataRecord> {
      */
     public void update(T oldEntity, T newEntity) throws DAOException;
 
+
 }

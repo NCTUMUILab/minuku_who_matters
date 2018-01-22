@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId "edu.nctu.minuku_2"
-        minSdkVersion 16
+        minSdkVersion 19
         targetSdkVersion 24
         versionCode 1
         versionName "1.0"
