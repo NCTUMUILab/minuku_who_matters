@@ -93,7 +93,7 @@ public class WifiReceiver extends BroadcastReceiver {
     private static final String postDumpUrl = "http://ec2-18-220-229-235.us-east-2.compute.amazonaws.com:8000/upload/";//&action=insert, search
     private static final String postTripUrl = "http://192.168.10.93:5000/request?collection=trip";//&action=insert, search
 
-    public static int mainThreadUpdateFrequencyInSeconds =10;
+    public static int mainThreadUpdateFrequencyInSeconds = 1800;
     public static long mainThreadUpdateFrequencyInMilliseconds = mainThreadUpdateFrequencyInSeconds * Constants.MILLISECONDS_PER_SECOND;
 
 
@@ -187,65 +187,68 @@ public class WifiReceiver extends BroadcastReceiver {
     public void MakingJsonDumpData(){
 
         Log.d(TAG, "MakingJsonDumpData");
-        if(!getOldestDataTime()){
-            return;
-        }
+//        if(!getOldestDataTime()){
+//            return;
+//        }
 
-        JSONObject data = new JSONObject();
+        while(getOldestDataTime()) {
 
-        try {
+            JSONObject data = new JSONObject();
 
-            data.put("device_id", Constants.DEVICE_ID);
+            try {
 
-
-            data.put("startTime", String.valueOf(startTime));
-            data.put("endTime", String.valueOf(endTime));
-            data.put("startTimeString", getTimeString(startTime));
-            data.put("endTimeString", getTimeString(endTime));
-        }catch (JSONException e){
-            e.printStackTrace();
-        }
-
-        storeTransporatation(data);
-        storeLocation(data);
-        storeActivityRecognition(data);
-        storeRinger(data);
-        storeConnectivity(data);
-        storeBattery(data);
-        storeAppUsage(data);
-
-        //storeTelephony(data);
-        //storeSensor(data);
-        //storeAccessibility(data);
-
-        Log.d(TAG,"final data : "+ data.toString());
+                data.put("device_id", Constants.DEVICE_ID);
 
 
-        String curr =  getDateCurrentTimeZone(new Date().getTime());
+                data.put("startTime", String.valueOf(startTime));
+                data.put("endTime", String.valueOf(endTime));
+                data.put("startTimeString", getTimeString(startTime));
+                data.put("endTimeString", getTimeString(endTime));
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
 
-        //TODO upload to MongoDB
-        /*new HttpAsyncPostJsonTask().execute(postDumpUrl,
-                data.toString(),
-                "Dump",
-                curr);*/
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-                new HttpAsyncPostJsonTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR,
-                        postDumpUrl,
-                        data.toString(),
-                        "Dump",
-                        curr).get();
-            else
-                new HttpAsyncPostJsonTask().execute(
-                        postDumpUrl,
-                        data.toString(),
-                        "Dump",
-                        curr).get();
+            storeTransporatation(data);
+            storeLocation(data);
+            storeActivityRecognition(data);
+            storeRinger(data);
+            storeConnectivity(data);
+            storeBattery(data);
+            storeAppUsage(data);
 
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
+            storeTelephony(data);
+            storeSensor(data);
+            storeAccessibility(data);
+
+            Log.d(TAG, "final data : " + data.toString());
+
+
+            String curr = getDateCurrentTimeZone(new Date().getTime());
+
+            //TODO upload to MongoDB
+            /*new HttpAsyncPostJsonTask().execute(postDumpUrl,
+                    data.toString(),
+                    "Dump",
+                    curr);*/
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+                    new HttpAsyncPostJsonTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR,
+                            postDumpUrl,
+                            data.toString(),
+                            "Dump",
+                            curr).get();
+                else
+                    new HttpAsyncPostJsonTask().execute(
+                            postDumpUrl,
+                            data.toString(),
+                            "Dump",
+                            curr).get();
+
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            }
         }
 
     }
@@ -386,6 +389,9 @@ public class WifiReceiver extends BroadcastReceiver {
             deleteConnectivity(r_startTime, r_endTime);
             deleteBattery(r_startTime, r_endTime);
             deleteAppUsage(r_startTime, r_endTime);
+            deleteTelephony(r_startTime, r_endTime);
+            deleteSensor(r_startTime, r_endTime);
+
 
             }catch (JSONException e){
 
@@ -491,7 +497,7 @@ public class WifiReceiver extends BroadcastReceiver {
             Log.d(TAG, "after: "+  String.valueOf(calendar.getTimeInMillis()));
 
             startTime = calendar.getTimeInMillis();
-            endTime = calendar.getTimeInMillis()+(20 * 60 * 1000);
+            endTime = calendar.getTimeInMillis()+(60 * 60 * 1000);
             return Boolean.TRUE;
         }
         else{
@@ -1056,6 +1062,262 @@ public class WifiReceiver extends BroadcastReceiver {
     }
 
     private void deleteAppUsage(Long startTime, Long endTime) {
+        Log.d(TAG, "deleteAppUsage");
+        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        db.delete(DBHelper.appUsage_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
+    }
+
+    private void storeTelephony(JSONObject data){
+
+        Log.d(TAG, "storeTelephony");
+
+        try {
+
+            JSONObject telephonyAndtimestampsJson = new JSONObject();
+
+            JSONArray NetworkOperatorNames = new JSONArray();
+            JSONArray CallStates = new JSONArray();
+            JSONArray PhoneSignalTypes = new JSONArray();
+            JSONArray GsmSignalStrengths = new JSONArray();
+            JSONArray LTESignalStrengths = new JSONArray();
+            JSONArray CdmaSignalStrengthLevels = new JSONArray();
+            JSONArray timestamps = new JSONArray();
+
+            SQLiteDatabase db = DBManager.getInstance().openDatabase();
+            Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
+            Log.d(TAG,"SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+
+            int rows = transCursor.getCount();
+
+            Log.d(TAG, "rows : "+rows);
+
+            if(rows!=0){
+                transCursor.moveToFirst();
+                for(int i=0;i<rows;i++) {
+                    String timestamp = transCursor.getString(1);
+                    String NetworkOperatorName = transCursor.getString(2);
+                    String CallState = transCursor.getString(3);
+                    String PhoneSignalType = transCursor.getString(4);
+                    String GsmSignalStrength = transCursor.getString(5);
+                    String LTESignalStrength = transCursor.getString(6);
+                    String CdmaSignalStrengthLevel = transCursor.getString(7);
+
+                    Log.d(TAG,"timestamp : "+timestamp+" NetworkOperatorName : "+NetworkOperatorName+" CallState : "+CallState+" PhoneSignalType : "+PhoneSignalType+" GsmSignalStrength : "+GsmSignalStrength+" LTESignalStrength : "+LTESignalStrength+" CdmaSignalStrengthLevel : "+CdmaSignalStrengthLevel );
+
+
+                    NetworkOperatorNames.put(NetworkOperatorName);
+                    CallStates.put(CallState);
+                    PhoneSignalTypes.put(PhoneSignalType);
+                    GsmSignalStrengths.put(GsmSignalStrength);
+                    LTESignalStrengths.put(LTESignalStrength);
+                    CdmaSignalStrengthLevels.put(CdmaSignalStrengthLevel);
+                    timestamps.put(timestamp);
+
+                    transCursor.moveToNext();
+                }
+
+                telephonyAndtimestampsJson.put("NetworkOperatorName",NetworkOperatorNames);
+                telephonyAndtimestampsJson.put("CallState",CallStates);
+                telephonyAndtimestampsJson.put("PhoneSignalType",PhoneSignalTypes);
+                telephonyAndtimestampsJson.put("GsmSignalStrength",GsmSignalStrengths);
+                telephonyAndtimestampsJson.put("LTESignalStrength",LTESignalStrengths);
+                telephonyAndtimestampsJson.put("CdmaSignalStrengthLevel",CdmaSignalStrengthLevels);
+                telephonyAndtimestampsJson.put("timestamp",timestamps);
+
+                data.put("telephony",telephonyAndtimestampsJson);
+
+            }else
+                noDataFlag7 = true;
+
+        }catch (JSONException e){
+            e.printStackTrace();
+        }catch(NullPointerException e){
+            e.printStackTrace();
+        }
+
+        Log.d(TAG,"data : "+ data.toString());
+
+    }
+
+    private void deleteTelephony(Long startTime, Long endTime) {
+        Log.d(TAG, "deleteAppUsage");
+        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        db.delete(DBHelper.telephony_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
+    }
+
+    private void storeSensor(JSONObject data){
+
+        Log.d(TAG, "storeSensor");
+
+        try {
+
+            JSONObject sensorAndtimestampsJson = new JSONObject();
+
+            JSONArray ACCELEROMETERs = new JSONArray();
+            JSONArray GYROSCOPEs = new JSONArray();
+            JSONArray GRAVITYs = new JSONArray();
+            JSONArray LINEAR_ACCELERATIONs = new JSONArray();
+            JSONArray ROTATION_VECTORs = new JSONArray();
+            JSONArray PROXIMITYs = new JSONArray();
+            JSONArray MAGNETIC_FIELDs = new JSONArray();
+            JSONArray LIGHTs = new JSONArray();
+            JSONArray PRESSUREs = new JSONArray();
+            JSONArray RELATIVE_HUMIDITYs = new JSONArray();
+            JSONArray AMBIENT_TEMPERATUREs = new JSONArray();
+            JSONArray timestamps = new JSONArray();
+
+            SQLiteDatabase db = DBManager.getInstance().openDatabase();
+            Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
+            Log.d(TAG,"SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+
+            int rows = transCursor.getCount();
+
+            Log.d(TAG, "rows : "+rows);
+
+            if(rows!=0){
+                transCursor.moveToFirst();
+                for(int i=0;i<rows;i++) {
+                    String timestamp = transCursor.getString(1);
+                    String ACCELEROMETER = transCursor.getString(2);
+                    String GYROSCOPE = transCursor.getString(3);
+                    String GRAVITY = transCursor.getString(4);
+                    String LINEAR_ACCELERATION = transCursor.getString(5);
+                    String ROTATION_VECTOR = transCursor.getString(6);
+                    String PROXIMITY = transCursor.getString(7);
+                    String MAGNETIC_FIELD = transCursor.getString(8);
+                    String LIGHT = transCursor.getString(9);
+                    String PRESSURE = transCursor.getString(10);
+                    String RELATIVE_HUMIDITY = transCursor.getString(11);
+                    String AMBIENT_TEMPERATURE = transCursor.getString(12);
+
+
+
+                    Log.d(TAG,"timestamp : "+timestamp+" ACCELEROMETER : "+ACCELEROMETER+
+                            " GYROSCOPE : "+GYROSCOPE+" LINEAR_ACCELERATION : "+LINEAR_ACCELERATION+
+                            " ROTATION_VECTOR : " +ROTATION_VECTOR+" PROXIMITY : "+PROXIMITY+" MAGNETIC_FIELD : " +MAGNETIC_FIELD +
+                            " LIGHT : " +LIGHT+" PRESSURE : "+PRESSURE+" RELATIVE_HUMIDITY : " +RELATIVE_HUMIDITY+
+                            " AMBIENT_TEMPERATURE : " +AMBIENT_TEMPERATURE
+                    );
+
+
+                    ACCELEROMETERs.put(ACCELEROMETER);
+                    GYROSCOPEs.put(GYROSCOPE);
+                    GRAVITYs.put(GRAVITY);
+                    LINEAR_ACCELERATIONs.put(LINEAR_ACCELERATION);
+                    ROTATION_VECTORs.put(ROTATION_VECTOR);
+                    PROXIMITYs.put(PROXIMITY);
+                    MAGNETIC_FIELDs.put(MAGNETIC_FIELD);
+                    LIGHTs.put(LIGHT);
+                    PRESSUREs.put(PRESSURE);
+                    RELATIVE_HUMIDITYs.put(RELATIVE_HUMIDITY);
+                    AMBIENT_TEMPERATUREs.put(AMBIENT_TEMPERATURE);
+                    timestamps.put(timestamp);
+
+                    transCursor.moveToNext();
+                }
+
+                sensorAndtimestampsJson.put("ACCELEROMETER",ACCELEROMETERs);
+                sensorAndtimestampsJson.put("GYROSCOPE",GYROSCOPEs);
+                sensorAndtimestampsJson.put("LINEAR_ACCELERATION",LINEAR_ACCELERATIONs);
+                sensorAndtimestampsJson.put("ROTATION_VECTOR",ROTATION_VECTORs);
+                sensorAndtimestampsJson.put("PROXIMITY",PROXIMITYs);
+                sensorAndtimestampsJson.put("MAGNETIC_FIELD",MAGNETIC_FIELDs);
+                sensorAndtimestampsJson.put("LIGHT",LIGHTs);
+                sensorAndtimestampsJson.put("PRESSURE",PRESSUREs);
+                sensorAndtimestampsJson.put("RELATIVE_HUMIDITY",RELATIVE_HUMIDITYs);
+                sensorAndtimestampsJson.put("AMBIENT_TEMPERATURE",AMBIENT_TEMPERATUREs);
+                sensorAndtimestampsJson.put("timestamp",timestamps);
+
+                data.put("sensor",sensorAndtimestampsJson);
+
+            }else
+                noDataFlag7 = true;
+
+        }catch (JSONException e){
+            e.printStackTrace();
+        }catch(NullPointerException e){
+            e.printStackTrace();
+        }
+
+        Log.d(TAG,"data : "+ data.toString());
+
+    }
+
+    private void deleteSensor(Long startTime, Long endTime) {
+        Log.d(TAG, "deleteAppUsage");
+        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        db.delete(DBHelper.sensor_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
+    }
+
+    private void storeAccessibility(JSONObject data){
+
+        Log.d(TAG, "storeAppUsage");
+
+        try {
+
+            JSONObject appUsageAndtimestampsJson = new JSONObject();
+
+            JSONArray packs = new JSONArray();
+            JSONArray texts = new JSONArray();
+            JSONArray types = new JSONArray();
+            JSONArray extras = new JSONArray();
+            JSONArray timestamps = new JSONArray();
+
+            SQLiteDatabase db = DBManager.getInstance().openDatabase();
+            Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.accessibility_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
+            Log.d(TAG,"SELECT * FROM "+DBHelper.accessibility_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+
+            int rows = transCursor.getCount();
+
+            Log.d(TAG, "rows : "+rows);
+
+            if(rows!=0){
+                transCursor.moveToFirst();
+                for(int i=0;i<rows;i++) {
+                    String timestamp = transCursor.getString(1);
+                    String pack = transCursor.getString(2);
+                    String text = transCursor.getString(3);
+                    String type = transCursor.getString(4);
+                    String extra = transCursor.getString(5);
+
+                    Log.d(TAG,"timestamp : "+timestamp+" pack : "+pack+" text : "+text+" type : "+type+" extra : "+extra);
+
+                    packs.put(pack);
+                    texts.put(text);
+                    types.put(type);
+                    extras.put(extra);
+
+                    timestamps.put(timestamp);
+
+                    transCursor.moveToNext();
+                }
+
+                appUsageAndtimestampsJson.put("pack",packs);
+                appUsageAndtimestampsJson.put("text",texts);
+                appUsageAndtimestampsJson.put("type",types);
+                appUsageAndtimestampsJson.put("extra",extras);
+//                appUsageAndtimestampsJson.put("Latest_Foreground_Activity",Latest_Foreground_Activitys);
+                appUsageAndtimestampsJson.put("timestamps",timestamps);
+
+                data.put("Accessibility",appUsageAndtimestampsJson);
+
+            }else
+                noDataFlag7 = true;
+
+        }catch (JSONException e){
+            e.printStackTrace();
+        }catch(NullPointerException e){
+            e.printStackTrace();
+        }
+
+        Log.d(TAG,"data : "+ data.toString());
+
+    }
+
+    private void deleteAccessibility(Long startTime, Long endTime) {
         Log.d(TAG, "deleteAppUsage");
         Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
         SQLiteDatabase db = DBManager.getInstance().openDatabase();

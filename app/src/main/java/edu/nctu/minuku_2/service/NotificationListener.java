@@ -166,9 +166,15 @@ public class NotificationListener extends NotificationListenerService {
 
             if(sbn.getPackageName().equals(ApplicationPackageNames.FACEBOOK_MESSENGER_PACK_NAME)){
                 app = "fb";
+                if(title.contains("聊天大頭貼使用中") || title.isEmpty() || text.isEmpty() || text.contains("：")){
+                    return;
+                }
             }
             else if(sbn.getPackageName().equals(ApplicationPackageNames.LINE_PACK_NAME)){
                 app = "line";
+                if(title.contains("聊天大頭貼使用中") || title.isEmpty() || text.isEmpty() || !subText.isEmpty()){
+                    return;
+                }
             }
 
 

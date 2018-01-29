@@ -26,7 +26,7 @@
 
     <string name="sharedPreference">edu.nctu.minuku_2</string>
 
-    <string name="app_name">Labeling Study</string>
+    <string name="app_name">Who Matters</string>
     <string name="ok">OK</string>
     <string name="permission_location_rationale">The app needs location for context</string>
     <string name="squarecamera__app_name">Minuku</string>
