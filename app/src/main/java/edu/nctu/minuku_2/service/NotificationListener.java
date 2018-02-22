@@ -39,7 +39,10 @@ import org.json.JSONException;
 import android.telephony.TelephonyManager;
 import android.content.Context;
 
+import java.net.URLEncoder;
 import java.util.Date;
+import java.util.Calendar;
+import java.text.SimpleDateFormat;
 
 import edu.nctu.minuku_2.R;
 import edu.nctu.minuku_2.Receiver.WifiReceiver;
@@ -100,7 +103,7 @@ public class NotificationListener extends NotificationListenerService {
         Log.d(TAG, "Notification received: "+sbn.getPackageName()+":"+sbn.getNotification().tickerText);
 
         Long last_form_done_time = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE)
-                .getLong("last_form_done_time", 0);
+                .getLong("last_form_done_time", 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        );
 
         if(unixTime - last_form_done_time > 60*60){
             try {
@@ -190,8 +193,16 @@ public class NotificationListener extends NotificationListenerService {
 
             }
 
+            Calendar c = Calendar.getInstance();
+            SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            String formattedDate = df.format(c.getTime());
+
             Intent resultIntent = new Intent(Intent.ACTION_VIEW);
-            resultIntent.setData(Uri.parse("http://ec2-18-220-229-235.us-east-2.compute.amazonaws.com:8000/notification/?data="+manJson.toString()));
+            try {
+                resultIntent.setData(Uri.parse("https://nctucommunication.qualtrics.com/jfe/form/SV_78KPI6cbgtRFHp3?app="+app+"&title="+ URLEncoder.encode(title, "UTF-8") +"&text="+URLEncoder.encode(text, "UTF-8")+"&created_at="+unixTime*1000+"&user="+deviceId+"&time="+URLEncoder.encode(formattedDate, "UTF-8")));
+            } catch (java.io.UnsupportedEncodingException e){
+                resultIntent.setData(Uri.parse("https://nctucommunication.qualtrics.com/jfe/form/SV_78KPI6cbgtRFHp3?app="+app+"&title="+title+"&text="+text+"&created_at="+unixTime*1000+"&user="+deviceId+"&time="+formattedDate));
+            }
             PendingIntent formIntent = PendingIntent.getActivity(this, 0, resultIntent, 0);
 
             Intent buttonIntent = new Intent(this, NotificationReceiver.class);
@@ -225,7 +236,7 @@ public class NotificationListener extends NotificationListenerService {
                         .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                         .setPriority(NotificationCompat.PRIORITY_MAX)
                         .setWhen(System.currentTimeMillis()+5000)
-//                    .setContentIntent(pi)
+                        .setContentIntent(formIntent)
                         .setAutoCancel(true)
                         .setOngoing(true);
                 send_form = Boolean.TRUE;
