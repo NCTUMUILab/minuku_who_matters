@@ -105,19 +105,19 @@ public class NotificationListener extends NotificationListenerService {
         Long last_form_done_time = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE)
                 .getLong("last_form_done_time", 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        );
 
-        if(unixTime - last_form_done_time > 60*60){
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-                    new SendHttpRequestTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR).get();
-                else
-                    new SendHttpRequestTask().execute().get();
-
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            }
-        }
+//        if(unixTime - last_form_done_time > 60*60){
+//            try {
+//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+//                    new SendHttpRequestTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR).get();
+//                else
+//                    new SendHttpRequestTask().execute().get();
+//
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            } catch (ExecutionException e) {
+//                e.printStackTrace();
+//            }
+//        }
 
 
 
@@ -175,7 +175,7 @@ public class NotificationListener extends NotificationListenerService {
             }
             else if(sbn.getPackageName().equals(ApplicationPackageNames.LINE_PACK_NAME)){
                 app = "line";
-                if(title.contains("聊天大頭貼使用中") || title.isEmpty() || text.isEmpty() || !subText.isEmpty()){
+                if(tickerText.contains("您有新訊息") || title.isEmpty() || text.isEmpty() || !subText.isEmpty()){
                     return;
                 }
             }
@@ -203,7 +203,19 @@ public class NotificationListener extends NotificationListenerService {
             } catch (java.io.UnsupportedEncodingException e){
                 resultIntent.setData(Uri.parse("https://nctucommunication.qualtrics.com/jfe/form/SV_78KPI6cbgtRFHp3?app="+app+"&title="+title+"&text="+text+"&created_at="+unixTime*1000+"&user="+deviceId+"&time="+formattedDate));
             }
-            PendingIntent formIntent = PendingIntent.getActivity(this, 0, resultIntent, 0);
+
+            Intent notificationIntent = new Intent(getApplicationContext(),  edu.nctu.minuku_2.ResultActivity.class);
+            try{
+                notificationIntent.putExtra("URL", "https://nctucommunication.qualtrics.com/jfe/form/SV_78KPI6cbgtRFHp3?app="+app+"&title="+ URLEncoder.encode(title, "UTF-8") +"&text="+URLEncoder.encode(text, "UTF-8")+"&created_at="+unixTime*1000+"&user="+deviceId+"&time="+URLEncoder.encode(formattedDate, "UTF-8"));
+
+            } catch (java.io.UnsupportedEncodingException e){
+                notificationIntent.putExtra("URL", "https://nctucommunication.qualtrics.com/jfe/form/SV_78KPI6cbgtRFHp3?app="+app+"&title="+title+"&text="+text+"&created_at="+unixTime*1000+"&user="+deviceId+"&time="+formattedDate);
+            }
+            notificationIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+
+            PendingIntent formIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+
 
             Intent buttonIntent = new Intent(this, NotificationReceiver.class);
             buttonIntent.putExtra("notificationId", 0);

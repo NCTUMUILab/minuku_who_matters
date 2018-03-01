@@ -23,6 +23,8 @@
 package edu.nctu.minuku_2;
 
 import android.app.DatePickerDialog;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
@@ -34,6 +36,7 @@ import android.os.Parcelable;
 import android.provider.Settings;
 import android.support.design.widget.TabLayout;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.PagerAdapter;
 import android.support.v4.view.ViewPager;
@@ -49,10 +52,14 @@ import android.widget.DatePicker;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -87,6 +94,7 @@ import android.content.IntentFilter;
 import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.telephony.TelephonyManager;
 
 
 
@@ -136,6 +144,10 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String ENABLED_NOTIFICATION_LISTENERS = "enabled_notification_listeners";
     private static final String ACTION_NOTIFICATION_LISTENER_SETTINGS = "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS";
+    private WebView mWebView;
+
+    private TextView t;
+
 
     //private UserSubmissionStats mUserSubmissionStats;
 
@@ -160,30 +172,37 @@ public class MainActivity extends AppCompatActivity {
         intentFilter.addAction(CONNECTIVITY_ACTION);
         mWifiReceiver = new WifiReceiver();
 
-        //compensationMessage = (TextView) findViewById(R.id.compensation_message);
+        getDeviceid();
 
-//        initializeActionList();
+        if(!isNotificationServiceEnabled()) {
+            Log.d(TAG, "notification start!!");
+            enableNotificationListenerAlertDialog = buildNotificationServiceAlertDialog();
+            enableNotificationListenerAlertDialog.show();
+        }else{
+            toggleNotificationListenerService();
+        }
 
         Log.e(TAG,"start");
 
         setContentView(R.layout.activity_main);
 
+        t=new TextView(this);
+
+        t=(TextView)findViewById(R.id.deviceID);
+        t.setText(Constants.DEVICE_ID);
+
+        final Button button_init_permission = (Button) findViewById(R.id.button_init_permission);
+        button_init_permission.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                checkAndRequestPermissions();
+                startpermission();
+
+            }
+        });
+
+
         Log.d(TAG," getString(R.string.sharedPreference) : " + getString(R.string.sharedPreference));
         sharedPrefs = getSharedPreferences(getString(R.string.sharedPreference), MODE_PRIVATE);
-
-        //final
-        LayoutInflater mInflater = getLayoutInflater().from(this);
-//        timerview = mInflater.inflate(R.layout.home, null);
-        timerview = mInflater.inflate(R.layout.activity_welcome, null);
-        recordview = mInflater.inflate(R.layout.activity_timeline, null);
-
-//        initViewPager(timerview,recordview);
-        initViewPager();
-
-        SettingViewPager(timerview, recordview);
-
-        go = (Button) timerview.findViewById(R.id.btn_go);
-        go.setOnClickListener(doClick);
 
 
         firstTimeToShowDialogOrNot = sharedPrefs.getBoolean("firstTimeToShowDialogOrNot", true);
@@ -194,12 +213,7 @@ public class MainActivity extends AppCompatActivity {
             sharedPrefs.edit().putBoolean("firstTimeToShowDialogOrNot", firstTimeToShowDialogOrNot).apply();
         }
 
-        toggleNotificationListenerService();
-        if(!isNotificationServiceEnabled()) {
-            Log.d(TAG, "notification start!!");
-            enableNotificationListenerAlertDialog = buildNotificationServiceAlertDialog();
-            enableNotificationListenerAlertDialog.show();
-        }
+
 
 
 
@@ -208,7 +222,7 @@ public class MainActivity extends AppCompatActivity {
         startService(new Intent(getBaseContext(), BackgroundService.class));
         startService(new Intent(getBaseContext(), NotificationListener.class));
 //        startService(new Intent(getBaseContext(), ExpSampleMethodService.class));
-        startService(new Intent(getBaseContext(), CheckpointAndReminderService.class));
+//        startService(new Intent(getBaseContext(), CheckpointAndReminderService.class));
 
         EventBus.getDefault().register(this);
 
@@ -219,17 +233,10 @@ public class MainActivity extends AppCompatActivity {
             startServiceWork();
         }
 
-
-//        Object dataTransfer[] = new Object[1];
-
-//        GetNearbyPlacesData getNearbyPlacesData = new GetNearbyPlacesData();
-//        String url = GetUrl.getUrl(121.0006081,24.7856825);
-//        dataTransfer[0] = url;
-//
-//        getNearbyPlacesData.execute(dataTransfer);
     }
 
     private boolean isNotificationServiceEnabled(){
+        Log.d(TAG, "isNotificationServiceEnabled");
         String pkgName = getPackageName();
         final String flat = Settings.Secure.getString(getContentResolver(),
                 ENABLED_NOTIFICATION_LISTENERS);
@@ -248,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void toggleNotificationListenerService() {
-        Log.d("FFF", "toggleNotificationListenerService");
+        Log.d(TAG, "toggleNotificationListenerService");
         PackageManager pm = getPackageManager();
         pm.setComponentEnabledSetting(new ComponentName(this, edu.nctu.minuku_2.service.NotificationListener.class),
                 PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
@@ -259,7 +266,7 @@ public class MainActivity extends AppCompatActivity {
     private AlertDialog buildNotificationServiceAlertDialog(){
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(this);
         alertDialogBuilder.setTitle("start notification");
-        alertDialogBuilder.setMessage("gogogo");
+        alertDialogBuilder.setMessage("請開啟權限");
         alertDialogBuilder.setPositiveButton("yes",
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
@@ -356,68 +363,11 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    //public for update
-    public void initViewPager(){
-        mTabs = (android.support.design.widget.TabLayout) findViewById(R.id.tablayout);
-        mTabs.addTab(mTabs.newTab().setText("計時"));
-        mTabs.addTab(mTabs.newTab().setText("紀錄"));
-
-        mViewPager = (ViewPager) findViewById(R.id.viewpager);
-//        timerview.setTag(Constant.home_tag);
-
-
-    }
 
     protected void showToast(String aText) {
         Toast.makeText(this, aText, Toast.LENGTH_SHORT).show();
     }
 
-    public void improveMenu(boolean bool){
-        Constant.tabpos = bool;
-        ActivityCompat.invalidateOptionsMenu(this);
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        //menu.findItem(R.id.action_selectdate).setVisible(false);
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onPrepareOptionsMenu(Menu menu) {
-
-        if(Constant.tabpos)
-            menu.findItem(R.id.action_selectdate).setVisible(true);
-        else
-            menu.findItem(R.id.action_selectdate).setVisible(false);
-        super.onPrepareOptionsMenu(menu);
-
-        return true;
-    }
-
-    public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.action_report:
-                startActivity(new Intent(MainActivity.this, report.class));
-                return true;
-            case R.id.action_selectdate:
-                final Calendar c = Calendar.getInstance();
-                mYear = c.get(Calendar.YEAR);
-                mMonth = c.get(Calendar.MONTH);
-                mDay = c.get(Calendar.DAY_OF_MONTH);
-                new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
-                    @Override
-                    public void onDateSet(DatePicker view, int year, int month, int day) {
-                        String format = setDateFormat(year,month,day);
-                        //startdate.setText(format);
-                    }
-
-                }, mYear,mMonth, mDay).show();
-                return true;
-        }
-        return true;
-    }
 
     private void checkAndRequestPermissions() {
 
@@ -568,7 +518,7 @@ public class MainActivity extends AppCompatActivity {
                     //hide date on menu
                     Constant.tabpos = false;
 
-                invalidateOptionsMenu();
+//                invalidateOptionsMenu();
             }
 
             @Override

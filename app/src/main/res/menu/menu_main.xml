@@ -2,13 +2,13 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
       xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_report"
-        android:title="創建報告"
+        android:id="@+id/action_system_msg"
+        android:title="系統資訊"
         android:icon="@android:drawable/ic_menu_save"
         app:showAsAction="never" />
     <item
-        android:id="@+id/action_selectdate"
-        android:title="日期選擇"
+        android:id="@+id/action_get_permission"
+        android:title="獲取權限"
         android:icon="@android:drawable/ic_menu_my_calendar"
-        app:showAsAction="always" />
+        app:showAsAction="never" />
 </menu>

@@ -59,7 +59,8 @@ public class MobileAccessibilityService extends AccessibilityService {
         String extra = "";
         long time = -1;
 
-        Log.d(TAG,"onAccessibilityEvent");
+        Log.d(TAG,"onAccessibilityEvent" + accessibilityEvent.toString());
+        Log.d(TAG, accessibilityEvent.getContentDescription().toString());
 
         if(accessibilityEvent.getPackageName()!=null){
             pack=accessibilityEvent.getPackageName().toString();

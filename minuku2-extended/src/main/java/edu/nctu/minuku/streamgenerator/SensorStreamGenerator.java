@@ -326,7 +326,7 @@ public class SensorStreamGenerator extends AndroidStreamGenerator<SensorDataReco
         }
 
         data = sourceName+": "+data;
-        Log.d(TAG, "data  "+ data);
+//        Log.d(TAG, "data  "+ data);
 
         /*** Set data to SensorDataRecord **/
 //        newSensorDataRecord.setData(data);

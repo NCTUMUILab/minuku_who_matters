@@ -82,15 +82,15 @@
             android:value="AIzaSyCiV1bU3lnapK7kJJh-C1DIsGCZsf8JK8o" />
         -->
 
-        <activity android:name="edu.nctu.minuku_2.controller.report" />
-        <activity android:name="edu.nctu.minuku_2.controller.PlaceSelection" />
-        <activity android:name="edu.nctu.minuku_2.controller.home" />
-        <activity android:name="edu.nctu.minuku_2.controller.timer_move" />
-        <activity android:name="edu.nctu.minuku_2.controller.timer_site" />
-        <activity
-            android:name="edu.nctu.minuku_2.WelcomeActivity"
-            android:launchMode="singleInstance"
-            android:persistent="true" />
+        <activity android:name="edu.nctu.minuku_2.ResultActivity" />
+        <!--<activity android:name="edu.nctu.minuku_2.controller.PlaceSelection" />-->
+        <!--<activity android:name="edu.nctu.minuku_2.controller.home" />-->
+        <!--<activity android:name="edu.nctu.minuku_2.controller.timer_move" />-->
+        <!--<activity android:name="edu.nctu.minuku_2.controller.timer_site" />-->
+        <!--<activity-->
+            <!--android:name="edu.nctu.minuku_2.WelcomeActivity"-->
+            <!--android:launchMode="singleInstance"-->
+            <!--android:persistent="true" />-->
 
             <!--
                 <meta-data

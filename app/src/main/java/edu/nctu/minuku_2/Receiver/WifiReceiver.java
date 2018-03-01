@@ -126,7 +126,7 @@ public class WifiReceiver extends BroadcastReceiver {
         hour = sharedPrefs.getInt("StartHour", 0);
         min = sharedPrefs.getInt("StartMin",0);
 
-        Log.d(TAG, "year : "+ year+" month : "+ month+" day : "+ day+" hour : "+ hour+" min : "+ min);
+//        Log.d(TAG, "year : "+ year+" month : "+ month+" day : "+ day+" hour : "+ hour+" min : "+ min);
 
         if (activeNetwork != null) {
             // connected to the internet
@@ -220,7 +220,7 @@ public class WifiReceiver extends BroadcastReceiver {
             storeSensor(data);
             storeAccessibility(data);
 
-            Log.d(TAG, "final data : " + data.toString());
+//            Log.d(TAG, "final data : " + data.toString());
 
 
             String curr = getDateCurrentTimeZone(new Date().getTime());
@@ -492,16 +492,16 @@ public class WifiReceiver extends BroadcastReceiver {
         if (System.currentTimeMillis() - i > 60 * 60 * 1000){
             Calendar calendar = Calendar.getInstance();
             calendar.setTimeInMillis(i);
-            Log.d(TAG, "before: "+  String.valueOf(calendar.getTimeInMillis()));
+//            Log.d(TAG, "before: "+  String.valueOf(calendar.getTimeInMillis()));
 //            calendar.set(Calendar.MINUTE, 0);
-            Log.d(TAG, "after: "+  String.valueOf(calendar.getTimeInMillis()));
-
+//            Log.d(TAG, "after: "+  String.valueOf(calendar.getTimeInMillis()));
+//
             startTime = calendar.getTimeInMillis();
             endTime = calendar.getTimeInMillis()+(60 * 60 * 1000);
             return Boolean.TRUE;
         }
         else{
-            Log.d(TAG, "getOldestDataTime in one hour");
+//            Log.d(TAG, "getOldestDataTime in one hour");
             return Boolean.FALSE;
         }
     }
@@ -516,11 +516,11 @@ public class WifiReceiver extends BroadcastReceiver {
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor tripCursor = db.rawQuery("SELECT * FROM "+DBHelper.annotate_table, null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.annotate_table); //+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' "
+//            Log.d(TAG,"SELECT * FROM "+DBHelper.annotate_table); //+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' "
 
             int rows = tripCursor.getCount();
 
-            Log.d(TAG, "rows : "+rows);
+//            Log.d(TAG, "rows : "+rows);
 
             if(rows!=0){
                 tripCursor.moveToFirst();
@@ -542,8 +542,8 @@ public class WifiReceiver extends BroadcastReceiver {
                     String annotation_Goal = tripCursor.getString(7);
                     String annotation_SpecialEvent = tripCursor.getString(8);
 
-                    Log.d(TAG,"_id : "+_id+" startTime : "+startTime+" endTime : "+endTime+" sessionid : "+sessionid);
-                    Log.d(TAG,"activity : "+activity+" annotation_Goal : "+annotation_Goal+" annotation_SpecialEvent : "+annotation_SpecialEvent);
+//                    Log.d(TAG,"_id : "+_id+" startTime : "+startTime+" endTime : "+endTime+" sessionid : "+sessionid);
+//                    Log.d(TAG,"activity : "+activity+" annotation_Goal : "+annotation_Goal+" annotation_SpecialEvent : "+annotation_SpecialEvent);
 
                     annotation_Json.put("activity", activity);
                     annotation_Json.put("annotation_Goal", annotation_Goal);
@@ -561,7 +561,7 @@ public class WifiReceiver extends BroadcastReceiver {
                     tripCursor.moveToNext();
                 }
 
-                Log.d(TAG,"tripJson : "+ tripJson.toString());
+//                Log.d(TAG,"tripJson : "+ tripJson.toString());
 
             }
 
@@ -587,11 +587,11 @@ public class WifiReceiver extends BroadcastReceiver {
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.transportationMode_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.transportationMode_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+//            Log.d(TAG,"SELECT * FROM "+DBHelper.transportationMode_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
 
             int rows = transCursor.getCount();
 
-            Log.d(TAG, "rows : "+rows);
+//            Log.d(TAG, "rows : "+rows);
 
             if(rows!=0){
                 transCursor.moveToFirst();
@@ -635,7 +635,7 @@ public class WifiReceiver extends BroadcastReceiver {
 
     private void storeLocation(JSONObject data){
 
-        Log.d(TAG, "storeLocation");
+//        Log.d(TAG, "storeLocation");
 
         try {
 
@@ -648,7 +648,7 @@ public class WifiReceiver extends BroadcastReceiver {
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.location_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.location_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+//            Log.d(TAG,"SELECT * FROM "+DBHelper.location_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
 
             int rows = transCursor.getCount();
 
@@ -662,7 +662,7 @@ public class WifiReceiver extends BroadcastReceiver {
                     String longtitude = transCursor.getString(3);
                     String accuracy = transCursor.getString(4);
 
-                    Log.d(TAG,"timestamp : "+timestamp+" latitude : "+latitude+" longtitude : "+longtitude+" accuracy : "+accuracy);
+//                    Log.d(TAG,"timestamp : "+timestamp+" latitude : "+latitude+" longtitude : "+longtitude+" accuracy : "+accuracy);
 
                     accuracys.put(accuracy);
                     longtitudes.put(longtitude);
@@ -693,15 +693,15 @@ public class WifiReceiver extends BroadcastReceiver {
     }
 
     private void deleteLocation(Long startTime, Long endTime) {
-        Log.d(TAG, "deleteLocation");
-        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+//        Log.d(TAG, "deleteLocation");
+//        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
         SQLiteDatabase db = DBManager.getInstance().openDatabase();
         db.delete(DBHelper.location_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
 
     private void storeActivityRecognition(JSONObject data){
 
-        Log.d(TAG, "storeActivityRecognition");
+//        Log.d(TAG, "storeActivityRecognition");
 
         try {
 
@@ -713,11 +713,11 @@ public class WifiReceiver extends BroadcastReceiver {
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.activityRecognition_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.activityRecognition_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+//            Log.d(TAG,"SELECT * FROM "+DBHelper.activityRecognition_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
 
             int rows = transCursor.getCount();
 
-            Log.d(TAG, "rows : "+rows);
+//            Log.d(TAG, "rows : "+rows);
 
             if(rows!=0){
                 transCursor.moveToFirst();
@@ -726,7 +726,7 @@ public class WifiReceiver extends BroadcastReceiver {
                     String mostProbableActivity = transCursor.getString(2);
                     String probableActivities = transCursor.getString(3);
 
-                    Log.d(TAG,"timestamp : "+timestamp+" mostProbableActivity : "+mostProbableActivity+" probableActivities : "+probableActivities);
+//                    Log.d(TAG,"timestamp : "+timestamp+" mostProbableActivity : "+mostProbableActivity+" probableActivities : "+probableActivities);
 
                     mostProbableActivityz.put(mostProbableActivity);
                     probableActivitiesz.put(probableActivities);
@@ -755,8 +755,8 @@ public class WifiReceiver extends BroadcastReceiver {
     }
 
     private void deleteActivityRecognition(Long startTime, Long endTime) {
-        Log.d(TAG, "deleteActivityRecognition");
-        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+//        Log.d(TAG, "deleteActivityRecognition");
+//        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
         SQLiteDatabase db = DBManager.getInstance().openDatabase();
         db.delete(DBHelper.activityRecognition_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
@@ -780,11 +780,11 @@ public class WifiReceiver extends BroadcastReceiver {
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.ringer_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.ringer_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+//            Log.d(TAG,"SELECT * FROM "+DBHelper.ringer_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
 
             int rows = transCursor.getCount();
 
-            Log.d(TAG, "rows : "+rows);
+//            Log.d(TAG, "rows : "+rows);
 
             if(rows!=0){
                 transCursor.moveToFirst();
@@ -840,15 +840,15 @@ public class WifiReceiver extends BroadcastReceiver {
     }
 
     private void deleteRinger(Long startTime, Long endTime) {
-        Log.d(TAG, "deleteRinger");
-        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+//        Log.d(TAG, "deleteRinger");
+//        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
         SQLiteDatabase db = DBManager.getInstance().openDatabase();
         db.delete(DBHelper.ringer_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
 
     private void storeConnectivity(JSONObject data){
 
-        Log.d(TAG, "storeConnectivity");
+//        Log.d(TAG, "storeConnectivity");
 
         try {
 
@@ -865,11 +865,11 @@ public class WifiReceiver extends BroadcastReceiver {
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.connectivity_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.connectivity_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+//            Log.d(TAG,"SELECT * FROM "+DBHelper.connectivity_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
 
             int rows = transCursor.getCount();
 
-            Log.d(TAG, "rows : "+rows);
+//            Log.d(TAG, "rows : "+rows);
 
             if(rows!=0){
                 transCursor.moveToFirst();
@@ -882,11 +882,11 @@ public class WifiReceiver extends BroadcastReceiver {
                     String IsMobileAvailable = transCursor.getString(6);
                     String IsWifiConnected = transCursor.getString(7);
                     String IsMobileConnected = transCursor.getString(8);
-
-                    Log.d(TAG,"timestamp : "+timestamp+" NetworkType : "+NetworkType+" IsNetworkAvailable : "+IsNetworkAvailable
-                            +" IsConnected : "+IsConnected+" IsWifiAvailable : "+IsWifiAvailable
-                            +" IsMobileAvailable : "+IsMobileAvailable +" IsWifiConnected : "+IsWifiConnected
-                            +" IsMobileConnected : "+IsMobileConnected);
+//
+//                    Log.d(TAG,"timestamp : "+timestamp+" NetworkType : "+NetworkType+" IsNetworkAvailable : "+IsNetworkAvailable
+//                            +" IsConnected : "+IsConnected+" IsWifiAvailable : "+IsWifiAvailable
+//                            +" IsMobileAvailable : "+IsMobileAvailable +" IsWifiConnected : "+IsWifiConnected
+//                            +" IsMobileConnected : "+IsMobileConnected);
 
                     IsMobileConnecteds.put(IsMobileConnected);
                     IsWifiConnecteds.put(IsWifiConnected);
@@ -925,8 +925,8 @@ public class WifiReceiver extends BroadcastReceiver {
     }
 
     private void deleteConnectivity(Long startTime, Long endTime) {
-        Log.d(TAG, "deleteConnectivity");
-        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+//        Log.d(TAG, "deleteConnectivity");
+//        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
         SQLiteDatabase db = DBManager.getInstance().openDatabase();
         db.delete(DBHelper.connectivity_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
@@ -947,11 +947,11 @@ public class WifiReceiver extends BroadcastReceiver {
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.battery_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.battery_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+//            Log.d(TAG,"SELECT * FROM "+DBHelper.battery_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
 
             int rows = transCursor.getCount();
 
-            Log.d(TAG, "rows : "+rows);
+//            Log.d(TAG, "rows : "+rows);
 
             if(rows!=0){
                 transCursor.moveToFirst();
@@ -962,8 +962,8 @@ public class WifiReceiver extends BroadcastReceiver {
                     String BatteryChargingState = transCursor.getString(4);
                     String isCharging = transCursor.getString(5);
 
-                    Log.d(TAG,"timestamp : "+timestamp+" BatteryLevel : "+BatteryLevel+" BatteryPercentage : "+
-                            BatteryPercentage+" BatteryChargingState : "+BatteryChargingState+" isCharging : "+isCharging);
+//                    Log.d(TAG,"timestamp : "+timestamp+" BatteryLevel : "+BatteryLevel+" BatteryPercentage : "+
+//                            BatteryPercentage+" BatteryChargingState : "+BatteryChargingState+" isCharging : "+isCharging);
 
                     BatteryLevels.put(BatteryLevel);
                     BatteryPercentages.put(BatteryPercentage);
@@ -991,13 +991,13 @@ public class WifiReceiver extends BroadcastReceiver {
             e.printStackTrace();
         }
 
-        Log.d(TAG,"data : "+ data.toString());
+//        Log.d(TAG,"data : "+ data.toString());
 
     }
 
     private void deleteBattery(Long startTime, Long endTime) {
-        Log.d(TAG, "deleteBattery");
-        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+//        Log.d(TAG, "deleteBattery");
+//        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
         SQLiteDatabase db = DBManager.getInstance().openDatabase();
         db.delete(DBHelper.battery_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
@@ -1021,7 +1021,7 @@ public class WifiReceiver extends BroadcastReceiver {
 
             int rows = transCursor.getCount();
 
-            Log.d(TAG, "rows : "+rows);
+//            Log.d(TAG, "rows : "+rows);
 
             if(rows!=0){
                 transCursor.moveToFirst();
@@ -1031,7 +1031,7 @@ public class WifiReceiver extends BroadcastReceiver {
                     String Latest_Used_App = transCursor.getString(3);
                     String Latest_Foreground_Activity = transCursor.getString(4);
 
-                    Log.d(TAG,"timestamp : "+timestamp+" ScreenStatus : "+ScreenStatus+" Latest_Used_App : "+Latest_Used_App+" Latest_Foreground_Activity : "+Latest_Foreground_Activity);
+//                    Log.d(TAG,"timestamp : "+timestamp+" ScreenStatus : "+ScreenStatus+" Latest_Used_App : "+Latest_Used_App+" Latest_Foreground_Activity : "+Latest_Foreground_Activity);
 
                     ScreenStatusz.put(ScreenStatus);
                     Latest_Used_Apps.put(Latest_Used_App);
@@ -1057,20 +1057,20 @@ public class WifiReceiver extends BroadcastReceiver {
             e.printStackTrace();
         }
 
-        Log.d(TAG,"data : "+ data.toString());
+//        Log.d(TAG,"data : "+ data.toString());
 
     }
 
     private void deleteAppUsage(Long startTime, Long endTime) {
-        Log.d(TAG, "deleteAppUsage");
-        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+//        Log.d(TAG, "deleteAppUsage");
+//        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
         SQLiteDatabase db = DBManager.getInstance().openDatabase();
         db.delete(DBHelper.appUsage_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
 
     private void storeTelephony(JSONObject data){
 
-        Log.d(TAG, "storeTelephony");
+//        Log.d(TAG, "storeTelephony");
 
         try {
 
@@ -1086,11 +1086,11 @@ public class WifiReceiver extends BroadcastReceiver {
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+//            Log.d(TAG,"SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
 
             int rows = transCursor.getCount();
 
-            Log.d(TAG, "rows : "+rows);
+//            Log.d(TAG, "rows : "+rows);
 
             if(rows!=0){
                 transCursor.moveToFirst();
@@ -1103,7 +1103,7 @@ public class WifiReceiver extends BroadcastReceiver {
                     String LTESignalStrength = transCursor.getString(6);
                     String CdmaSignalStrengthLevel = transCursor.getString(7);
 
-                    Log.d(TAG,"timestamp : "+timestamp+" NetworkOperatorName : "+NetworkOperatorName+" CallState : "+CallState+" PhoneSignalType : "+PhoneSignalType+" GsmSignalStrength : "+GsmSignalStrength+" LTESignalStrength : "+LTESignalStrength+" CdmaSignalStrengthLevel : "+CdmaSignalStrengthLevel );
+//                    Log.d(TAG,"timestamp : "+timestamp+" NetworkOperatorName : "+NetworkOperatorName+" CallState : "+CallState+" PhoneSignalType : "+PhoneSignalType+" GsmSignalStrength : "+GsmSignalStrength+" LTESignalStrength : "+LTESignalStrength+" CdmaSignalStrengthLevel : "+CdmaSignalStrengthLevel );
 
 
                     NetworkOperatorNames.put(NetworkOperatorName);
@@ -1136,20 +1136,20 @@ public class WifiReceiver extends BroadcastReceiver {
             e.printStackTrace();
         }
 
-        Log.d(TAG,"data : "+ data.toString());
+//        Log.d(TAG,"data : "+ data.toString());
 
     }
 
     private void deleteTelephony(Long startTime, Long endTime) {
-        Log.d(TAG, "deleteAppUsage");
-        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+//        Log.d(TAG, "deleteAppUsage");
+//        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
         SQLiteDatabase db = DBManager.getInstance().openDatabase();
         db.delete(DBHelper.telephony_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
 
     private void storeSensor(JSONObject data){
 
-        Log.d(TAG, "storeSensor");
+//        Log.d(TAG, "storeSensor");
 
         try {
 
@@ -1170,11 +1170,11 @@ public class WifiReceiver extends BroadcastReceiver {
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+//            Log.d(TAG,"SELECT * FROM "+DBHelper.sensor_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
 
             int rows = transCursor.getCount();
 
-            Log.d(TAG, "rows : "+rows);
+//            Log.d(TAG, "rows : "+rows);
 
             if(rows!=0){
                 transCursor.moveToFirst();
@@ -1193,13 +1193,13 @@ public class WifiReceiver extends BroadcastReceiver {
                     String AMBIENT_TEMPERATURE = transCursor.getString(12);
 
 
-
-                    Log.d(TAG,"timestamp : "+timestamp+" ACCELEROMETER : "+ACCELEROMETER+
-                            " GYROSCOPE : "+GYROSCOPE+" LINEAR_ACCELERATION : "+LINEAR_ACCELERATION+
-                            " ROTATION_VECTOR : " +ROTATION_VECTOR+" PROXIMITY : "+PROXIMITY+" MAGNETIC_FIELD : " +MAGNETIC_FIELD +
-                            " LIGHT : " +LIGHT+" PRESSURE : "+PRESSURE+" RELATIVE_HUMIDITY : " +RELATIVE_HUMIDITY+
-                            " AMBIENT_TEMPERATURE : " +AMBIENT_TEMPERATURE
-                    );
+//
+//                    Log.d(TAG,"timestamp : "+timestamp+" ACCELEROMETER : "+ACCELEROMETER+
+//                            " GYROSCOPE : "+GYROSCOPE+" LINEAR_ACCELERATION : "+LINEAR_ACCELERATION+
+//                            " ROTATION_VECTOR : " +ROTATION_VECTOR+" PROXIMITY : "+PROXIMITY+" MAGNETIC_FIELD : " +MAGNETIC_FIELD +
+//                            " LIGHT : " +LIGHT+" PRESSURE : "+PRESSURE+" RELATIVE_HUMIDITY : " +RELATIVE_HUMIDITY+
+//                            " AMBIENT_TEMPERATURE : " +AMBIENT_TEMPERATURE
+//                    );
 
 
                     ACCELEROMETERs.put(ACCELEROMETER);
@@ -1241,13 +1241,13 @@ public class WifiReceiver extends BroadcastReceiver {
             e.printStackTrace();
         }
 
-        Log.d(TAG,"data : "+ data.toString());
+//        Log.d(TAG,"data : "+ data.toString());
 
     }
 
     private void deleteSensor(Long startTime, Long endTime) {
-        Log.d(TAG, "deleteAppUsage");
-        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+//        Log.d(TAG, "deleteAppUsage");
+//        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
         SQLiteDatabase db = DBManager.getInstance().openDatabase();
         db.delete(DBHelper.sensor_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
@@ -1268,11 +1268,11 @@ public class WifiReceiver extends BroadcastReceiver {
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.accessibility_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-            Log.d(TAG,"SELECT * FROM "+DBHelper.accessibility_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+//            Log.d(TAG,"SELECT * FROM "+DBHelper.accessibility_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
 
             int rows = transCursor.getCount();
 
-            Log.d(TAG, "rows : "+rows);
+//            Log.d(TAG, "rows : "+rows);
 
             if(rows!=0){
                 transCursor.moveToFirst();
@@ -1283,7 +1283,7 @@ public class WifiReceiver extends BroadcastReceiver {
                     String type = transCursor.getString(4);
                     String extra = transCursor.getString(5);
 
-                    Log.d(TAG,"timestamp : "+timestamp+" pack : "+pack+" text : "+text+" type : "+type+" extra : "+extra);
+//                    Log.d(TAG,"timestamp : "+timestamp+" pack : "+pack+" text : "+text+" type : "+type+" extra : "+extra);
 
                     packs.put(pack);
                     texts.put(text);

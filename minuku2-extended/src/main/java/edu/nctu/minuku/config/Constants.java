@@ -79,7 +79,7 @@ public class Constants {
 
 
     // Prompt service related constants
-    public static final int PROMPT_SERVICE_REPEAT_MILLISECONDS = 1000 * 10; // 1000 * 60 = 1 minute
+    public static final int PROMPT_SERVICE_REPEAT_MILLISECONDS = 1000 * 60 * 10; // 1000 * 60 = 1 minute
     //changing from 50 mins to 15 mins, users were getting it close to bedtime
     public static final int DIARY_NOTIFICATION_SERVICE_REPEAT_MILLISECONDS = 15 * 60 * 1000; //15 minutes
 
