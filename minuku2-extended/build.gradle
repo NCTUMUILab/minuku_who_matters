@@ -56,4 +56,7 @@ dependencies {
     /*Logger*/
     compile 'com.bugfender.sdk:android:0.+'
 
+    compile 'com.amplitude:android-sdk:2.16.0'
+
+
 }

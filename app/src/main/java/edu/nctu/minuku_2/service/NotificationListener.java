@@ -53,6 +53,11 @@ import java.io.InputStream;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.concurrent.ExecutionException;
+import edu.nctu.minuku.streamgenerator.LocationStreamGenerator;
+import com.amplitude.api.Amplitude;
+import com.amplitude.api.Identify;
+import android.os.Handler;
+
 
 /**
  * Created by kevchentw on 2018/1/20.
@@ -70,6 +75,9 @@ public class NotificationListener extends NotificationListenerService {
     private String tickerText;
     private String app;
     private Boolean send_form;
+    private String last_title;
+
+    private SharedPreferences sharedPrefs;
 
 
 
@@ -95,8 +103,11 @@ public class NotificationListener extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
+        Amplitude.getInstance().logEvent("GET_NOTIFICATION");
+
         long unixTime = System.currentTimeMillis() / 1000L;
 
+        sharedPrefs = getSharedPreferences(getString(R.string.sharedPreference), MODE_PRIVATE);
         SharedPreferences pref = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE);
 
         send_form = Boolean.FALSE;
@@ -169,13 +180,13 @@ public class NotificationListener extends NotificationListenerService {
 
             if(sbn.getPackageName().equals(ApplicationPackageNames.FACEBOOK_MESSENGER_PACK_NAME)){
                 app = "fb";
-                if(title.contains("聊天大頭貼使用中") || title.isEmpty() || text.isEmpty() || text.contains("：")){
+                if(title.contains("聊天大頭貼使用中") || tickerText.contains("傳送了") || tickerText.contains("You missed a call from") || tickerText.contains("你錯過了") || tickerText.contains("sent") || tickerText.contains("reacted") || tickerText.contains("送了一張貼圖") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty() || text.contains("：") || text.contains(": ")){
                     return;
                 }
             }
             else if(sbn.getPackageName().equals(ApplicationPackageNames.LINE_PACK_NAME)){
                 app = "line";
-                if(tickerText.contains("您有新訊息") || title.isEmpty() || text.isEmpty() || !subText.isEmpty()){
+                if(tickerText.contains("貼圖") ||  tickerText.contains("LINE系統") || tickerText.contains("您有新訊息") || title.contains("LINE未接來電") || title.contains("Missed LINE call") || text.contains("Incoming LINE voice call") ||  tickerText.contains("LINE未接來電") || title.contains("LINE語音通話來電中") || text.contains("LINE語音通話來電中") || tickerText.contains("傳送了") || tickerText.contains("記事本") || tickerText.contains("已建立")|| tickerText.contains("added a note") || tickerText.contains("sent") ||  tickerText.contains("語音訊息") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty() || !subText.isEmpty()){
                     return;
                 }
             }
@@ -230,17 +241,41 @@ public class NotificationListener extends NotificationListenerService {
             Long last_form_notification_sent_time = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE)
                     .getLong("last_form_notification_sent_time", 1);
 
-            Log.d("TAG", "unixTime" + Long.toString(unixTime));
-            Log.d("TAG", "last_form_done_time" + Long.toString(last_form_done_time));
-            Log.d("TAG", "DIFF" + Long.toString(unixTime - last_form_done_time));
 
-            if((unixTime - last_form_notification_sent_time > 300) && (unixTime - last_form_done_time > 60*60)) {
+            last_title = sharedPrefs.getString("last_title", "");
+            Log.d(TAG, "START CHECK");
+            Log.d(TAG, "title" + title);
+            Log.d(TAG, "last_title" + last_title);
+            Log.d(TAG, "compare: " + Boolean.toString(!title.equals(last_title)));
+            Log.d(TAG, "unixTime" + Long.toString(unixTime));
+            Log.d(TAG, "last_form_done_time" + Long.toString(last_form_done_time));
+            Log.d(TAG, "DIFF" + Long.toString(unixTime - last_form_done_time));
+            Log.d(TAG, "last_form_notification_sent_time" + Long.toString(last_form_notification_sent_time));
+            Log.d(TAG, "DIFF" + Long.toString(unixTime - last_form_notification_sent_time));
 
+            JSONObject amplitudeJson = new JSONObject();
+            try{
+                amplitudeJson.put("app", app);
+                amplitudeJson.put("title", title);
+                amplitudeJson.put("text", text);
+                amplitudeJson.put("created_at", unixTime*1000);
+                amplitudeJson.put("user", deviceId);
+                amplitudeJson.put("last_title", last_title);
+                amplitudeJson.put("last_form_done_time", last_form_done_time);
+                amplitudeJson.put("last_form_notification_sent_time", last_form_notification_sent_time);
+
+            } catch (JSONException e){
+
+            }
+
+            Amplitude.getInstance().logEvent("READY_TO_SEND_FORM");
+            if(Boolean.TRUE || !title.equals(last_title) && (unixTime - last_form_notification_sent_time > 300) && (unixTime - last_form_done_time > 60*60)) {
+                Amplitude.getInstance().logEvent("SUCCESS_SEND_FORM");
                 pref.edit()
                         .putLong("last_form_notification_sent_time", unixTime)
                         .apply();
                 mBuilder.setSmallIcon(R.drawable.self_reflection)
-                        .addAction(android.R.drawable.arrow_up_float, "填寫問卷", formIntent)
+//                        .addAction(android.R.drawable.arrow_up_float, "填寫問卷", formIntent)
                         .addAction(android.R.drawable.arrow_down_float, "略過", btPendingIntent)
                         .setTicker("(" + app + ") " + tickerText)
                         .setContentTitle("請填寫問卷")
@@ -259,7 +294,7 @@ public class NotificationListener extends NotificationListenerService {
                             @Override
                             public void run() {
                                 try {
-                                    Thread.sleep(300*1000);
+                                    Thread.sleep(600*1000);
                                 } catch (InterruptedException e) {
                                     Log.d(TAG, "sleep failure");
                                 }
@@ -268,6 +303,48 @@ public class NotificationListener extends NotificationListenerService {
                             }
                         }
                 ).start();
+
+                Handler h = new Handler();
+                long delayInMilliseconds = 600*1000;
+                h.postDelayed(new Runnable() {
+                    public void run() {
+                        mManager.cancel(0);
+                    }
+                }, delayInMilliseconds);
+
+//                new Thread(
+//                        new Runnable() {
+//                            @Override
+//                            public void run() {
+//                                int incr;
+//
+//                                // Do the "lengthy" operation 20 times
+//                                for (incr = 0; incr <= 60; incr+=1) {
+//                                    // Sets the progress indicator to a max value, the
+//                                    // current completion percentage, and "determinate"
+//                                    // state
+//                                    mBuilder.setProgress(60, incr, false);
+//                                    // Displays the progress bar for the first time.
+//                                    mManager.notify(0, mBuilder.build());
+//                                    // Sleeps the thread, simulating an operation
+//                                    // that takes time
+//                                    try {
+//                                        Thread.sleep(5000);
+//                                    } catch (InterruptedException e) {
+//                                        Log.d(TAG, "sleep failure");
+//                                    }
+//                                }
+////                                // When the loop is finished, updates the notification
+////                                mBuilder.setContentText("Download complete")
+////                                        // Removes the progress bar
+////                                        .setProgress(0,0,false);
+////                                mManager.notify(0, mBuilder.build());
+//                                mManager.cancel(0);
+//                            }
+//                        }
+//// Starts the thread by calling the run() method in its Runnable
+//                ).start();
+
             }
         }
 
@@ -280,7 +357,9 @@ public class NotificationListener extends NotificationListenerService {
             values.put(DBHelper.tickerText_col, tickerText);
             values.put(DBHelper.app_col, sbn.getPackageName());
             values.put(DBHelper.sendForm_col, send_form);
-
+            values.put(DBHelper.longitude_col, (float)LocationStreamGenerator.longitude.get());
+            values.put(DBHelper.latitude_col, (float)LocationStreamGenerator.latitude.get());
+            Log.d(TAG, values.toString());
             Log.d(TAG,"Save Notification");
 
             db.insert(DBHelper.notification_table, null, values);

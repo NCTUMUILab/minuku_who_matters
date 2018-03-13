@@ -25,11 +25,13 @@ package edu.nctu.minuku_2;
 import android.content.Context;
 
 //import com.bugfender.sdk.Bugfender;
+import com.crashlytics.android.Crashlytics;
 import com.firebase.client.Config;
 import com.instabug.library.IBGInvocationEvent;
 import com.instabug.library.Instabug;
 
 import edu.nctu.minuku.config.UserPreferences;
+import io.fabric.sdk.android.Fabric;
 
 /**
  * Created by neerajkumar on 7/18/16.
@@ -50,6 +52,7 @@ public class MinukuApp extends android.app.Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        Fabric.with(this, new Crashlytics());
         Config mConfig = new Config();
         mConfig.setPersistenceEnabled(true);
         long cacheSizeOfHundredMB = 100 * 1024 * 1024;

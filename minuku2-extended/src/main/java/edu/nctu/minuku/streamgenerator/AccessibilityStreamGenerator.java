@@ -2,6 +2,10 @@ package edu.nctu.minuku.streamgenerator;
 
 import android.content.Context;
 import android.content.Intent;
+import android.telephony.TelephonyManager;
+
+import com.amplitude.api.Amplitude;
+import com.amplitude.api.Identify;
 
 import org.greenrobot.eventbus.EventBus;
 
@@ -35,12 +39,28 @@ public class AccessibilityStreamGenerator extends AndroidStreamGenerator<Accessi
     private String text;
     private String type;
     private String extra;
+    private String deviceId;
 
     public AccessibilityStreamGenerator(Context applicationContext){
         super(applicationContext);
         this.mContext = applicationContext;
         this.mStream = new BatteryStream(Constants.DEFAULT_QUEUE_SIZE);
         this.mDAO = MinukuDAOManager.getInstance().getDaoFor(AccessibilityDataRecord.class);
+
+
+        TelephonyManager telephonyManager;
+        telephonyManager = (TelephonyManager) mContext.getSystemService(Context.
+                TELEPHONY_SERVICE);
+
+        try {
+            deviceId = telephonyManager.getDeviceId();
+        } catch (SecurityException e){
+            deviceId = "null";
+        }
+        Amplitude.getInstance().initialize(this.mContext, "5c53d03740fbc64a20da17140b911d6e");
+        Identify identify = new Identify().set("DEVICE_ID", deviceId);
+        Amplitude.getInstance().identify(identify);
+        Amplitude.getInstance().logEvent("INIT_AccessibilityStreamGenerator");
 
         mobileAccessibilityService = new MobileAccessibilityService(this);
 
@@ -90,7 +110,11 @@ public class AccessibilityStreamGenerator extends AndroidStreamGenerator<Accessi
         // also post an event.
         EventBus.getDefault().post(accessibilityDataRecord);
         try {
-            mDAO.add(accessibilityDataRecord);
+            if(!type.isEmpty()){
+                mDAO.add(accessibilityDataRecord);
+                Log.d(TAG, "updateStream add success");
+                Amplitude.getInstance().logEvent("Accessibility_updateStream_SUCCESS");
+            }
 
         } catch (DAOException e) {
             e.printStackTrace();

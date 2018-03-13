@@ -95,8 +95,8 @@ public class LocationStreamGenerator extends AndroidStreamGenerator<LocationData
 
     public static long lastposupdate = -99;
 
-    private AtomicDouble latitude;
-    private AtomicDouble longitude;
+    public static AtomicDouble latitude;
+    public static AtomicDouble longitude;
 
     private Context context;
 

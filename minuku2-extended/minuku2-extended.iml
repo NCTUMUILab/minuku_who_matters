@@ -109,6 +109,7 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="com.google.android.gms:play-services-wallet-9.2.1" level="project" />
     <orderEntry type="library" name="com.google.android.gms:play-services-cast-framework-9.2.1" level="project" />
+    <orderEntry type="library" name="com.amplitude:android-sdk:2.16.0@jar" level="project" />
     <orderEntry type="library" name="com.google.firebase:firebase-analytics-9.2.1" level="project" />
     <orderEntry type="library" name="com.bugfender.sdk:android-0.8.4" level="project" />
     <orderEntry type="library" name="com.google.android.gms:play-services-basement-9.2.1" level="project" />
@@ -159,6 +160,7 @@
     <orderEntry type="library" name="com.google.android.gms:play-services-iid-9.2.1" level="project" />
     <orderEntry type="library" name="com.android.support:animated-vector-drawable-24.2.1" level="project" />
     <orderEntry type="library" name="com.google.code.gson:gson:2.7@jar" level="project" />
+    <orderEntry type="library" name="com.squareup.okio:okio:1.13.0@jar" level="project" />
     <orderEntry type="library" name="com.google.firebase:firebase-storage-9.2.1" level="project" />
     <orderEntry type="library" name="com.google.firebase:firebase-analytics-impl-9.2.1" level="project" />
     <orderEntry type="library" name="com.google.firebase:firebase-crash-9.2.1" level="project" />
@@ -178,6 +180,7 @@
     <orderEntry type="library" name="com.google.android.gms:play-services-plus-9.2.1" level="project" />
     <orderEntry type="library" name="com.google.android.gms:play-services-gcm-9.2.1" level="project" />
     <orderEntry type="library" name="com.google.android.gms:play-services-maps-9.2.1" level="project" />
+    <orderEntry type="library" name="com.squareup.okhttp3:okhttp:3.9.0@jar" level="project" />
     <orderEntry type="library" name="com.google.android.gms:play-services-ads-lite-9.2.1" level="project" />
     <orderEntry type="library" name="com.android.support:support-core-ui-24.2.1" level="project" />
     <orderEntry type="library" name="com.android.support:support-compat-24.2.1" level="project" />

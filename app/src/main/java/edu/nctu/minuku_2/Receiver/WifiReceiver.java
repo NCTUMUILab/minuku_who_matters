@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.ConnectivityManager;
@@ -12,6 +13,11 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
+import android.support.v4.content.ContextCompat;
+import android.telephony.TelephonyManager;
+
+import com.crashlytics.android.answers.Answers;
+import com.crashlytics.android.answers.ContentViewEvent;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -54,7 +60,10 @@ import edu.nctu.minuku.manager.DBManager;
 import edu.nctu.minuku.model.DataRecord.ActivityRecognitionDataRecord;
 import edu.nctu.minuku.streamgenerator.ConnectivityStreamGenerator;
 import edu.nctu.minuku.manager.MinukuDAOManager;
+import edu.nctu.minuku_2.R;
+
 import java.lang.Long;
+import com.amplitude.api.Amplitude;
 /**
  * Created by Lawrence on 2017/8/16.
  */
@@ -63,6 +72,8 @@ public class WifiReceiver extends BroadcastReceiver {
 
     private final String TAG = "WifiReceiver";
     private Context mcontext;
+    private String device_id;
+    private Integer UPDATE_FREQUENCY_MIN = 30;
 
     private Handler mDumpThread, mTripThread;
 
@@ -99,6 +110,9 @@ public class WifiReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        Amplitude.getInstance().logEvent("WIFI_ONRECEIVED");
+
+
 
         Log.d(TAG, "onReceive");
 
@@ -120,6 +134,18 @@ public class WifiReceiver extends BroadcastReceiver {
         month = sharedPrefs.getInt("StartMonth", mMonth);
         day = sharedPrefs.getInt("StartDay", mDay);
 
+        TelephonyManager telephonyManager;
+        telephonyManager = (TelephonyManager) context.getSystemService(Context.
+                TELEPHONY_SERVICE);
+
+        try {
+            device_id = telephonyManager.getDeviceId();
+        } catch (SecurityException e){
+            device_id = "null";
+        }
+        Answers.getInstance().logContentView(new ContentViewEvent().putContentName("wifireceiver receive").putCustomAttribute("device_id", device_id));
+
+
         Constants.USER_ID = sharedPrefs.getString("userid","NA");
         Constants.GROUP_NUM = sharedPrefs.getString("groupNum","NA");
 
@@ -133,6 +159,7 @@ public class WifiReceiver extends BroadcastReceiver {
             if (activeNetwork.getType() == ConnectivityManager.TYPE_WIFI) {
                 // connected to wifi
                 Log.d(TAG,"INTERNETEVENT: Wifi activeNetwork");
+                Amplitude.getInstance().logEvent("WIFI_GET_WIFI_START_THREAD");
 
                 //do the work here.
                 MakingJsonDumpDataMainThread();
@@ -151,6 +178,10 @@ public class WifiReceiver extends BroadcastReceiver {
         } else {
             // not connected to the internet
             Log.d(TAG, "INTERNETEVENT: no Network" ) ;
+            Amplitude.getInstance().logEvent("WIFI_NO_WIFI");
+
+            Answers.getInstance().logContentView(new ContentViewEvent().putContentName("wifireceiver no wifi").putCustomAttribute("device_id", Constants.DEVICE_ID));
+
             if(runnable!=null) {
                 Log.d(TAG, "INTERNETEVENT: KILLTHREAD" ) ;
                 mDumpThread.removeCallbacks(runnable);
@@ -162,6 +193,8 @@ public class WifiReceiver extends BroadcastReceiver {
     public void MakingJsonDumpDataMainThread(){
 
         Log.d(TAG, "MakingJsonDumpDataMainThread") ;
+        Answers.getInstance().logContentView(new ContentViewEvent().putContentName("MakingJsonDumpDataMainThread").putCustomAttribute("device_id", Constants.DEVICE_ID));
+
 
         mDumpThread = new Handler();
 
@@ -191,13 +224,14 @@ public class WifiReceiver extends BroadcastReceiver {
 //            return;
 //        }
 
+        Amplitude.getInstance().logEvent("WIFI_START_DUMP_DATA");
         while(getOldestDataTime()) {
 
             JSONObject data = new JSONObject();
 
             try {
 
-                data.put("device_id", Constants.DEVICE_ID);
+                data.put("device_id", device_id);
 
 
                 data.put("startTime", String.valueOf(startTime));
@@ -219,6 +253,7 @@ public class WifiReceiver extends BroadcastReceiver {
             storeTelephony(data);
             storeSensor(data);
             storeAccessibility(data);
+            storeNotification(data);
 
 //            Log.d(TAG, "final data : " + data.toString());
 
@@ -376,6 +411,7 @@ public class WifiReceiver extends BroadcastReceiver {
 
             Log.d(TAG, "[postJSON] the result response code is " + responseCode);
             Log.d(TAG, "[postJSON] the result is " + result);
+            Amplitude.getInstance().logEvent("WIFI_START_UPLOAD_SUCCESS");
 
             try {
                 JSONObject obj = new JSONObject(result);
@@ -391,6 +427,8 @@ public class WifiReceiver extends BroadcastReceiver {
             deleteAppUsage(r_startTime, r_endTime);
             deleteTelephony(r_startTime, r_endTime);
             deleteSensor(r_startTime, r_endTime);
+            deleteAccessibility(r_startTime, r_endTime);
+            deleteNotification(r_startTime, r_endTime);
 
 
             }catch (JSONException e){
@@ -489,7 +527,7 @@ public class WifiReceiver extends BroadcastReceiver {
             return Boolean.FALSE;
         }
 
-        if (System.currentTimeMillis() - i > 60 * 60 * 1000){
+        if (System.currentTimeMillis() - i > UPDATE_FREQUENCY_MIN * 60 * 1000){
             Calendar calendar = Calendar.getInstance();
             calendar.setTimeInMillis(i);
 //            Log.d(TAG, "before: "+  String.valueOf(calendar.getTimeInMillis()));
@@ -497,7 +535,7 @@ public class WifiReceiver extends BroadcastReceiver {
 //            Log.d(TAG, "after: "+  String.valueOf(calendar.getTimeInMillis()));
 //
             startTime = calendar.getTimeInMillis();
-            endTime = calendar.getTimeInMillis()+(60 * 60 * 1000);
+            endTime = calendar.getTimeInMillis()+(UPDATE_FREQUENCY_MIN * 60 * 1000);
             return Boolean.TRUE;
         }
         else{
@@ -645,6 +683,7 @@ public class WifiReceiver extends BroadcastReceiver {
             JSONArray longtitudes = new JSONArray();
             JSONArray latitudes = new JSONArray();
             JSONArray timestamps = new JSONArray();
+            JSONArray Provider_cols = new JSONArray();
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.location_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
@@ -661,6 +700,8 @@ public class WifiReceiver extends BroadcastReceiver {
                     String latitude = transCursor.getString(2);
                     String longtitude = transCursor.getString(3);
                     String accuracy = transCursor.getString(4);
+                    String Provider_col = transCursor.getString(8);
+
 
 //                    Log.d(TAG,"timestamp : "+timestamp+" latitude : "+latitude+" longtitude : "+longtitude+" accuracy : "+accuracy);
 
@@ -676,6 +717,7 @@ public class WifiReceiver extends BroadcastReceiver {
                 locationAndtimestampsJson.put("Longtitudes",longtitudes);
                 locationAndtimestampsJson.put("Latitudes",latitudes);
                 locationAndtimestampsJson.put("timestamps",timestamps);
+                locationAndtimestampsJson.put("Provider_cols",Provider_cols);
 
                 data.put("Location",locationAndtimestampsJson);
 
@@ -1271,6 +1313,8 @@ public class WifiReceiver extends BroadcastReceiver {
 //            Log.d(TAG,"SELECT * FROM "+DBHelper.accessibility_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
 
             int rows = transCursor.getCount();
+            JSONObject a_data = new JSONObject();
+            Amplitude.getInstance().logEvent("storeAccessibility", a_data.put("row", rows));
 
 //            Log.d(TAG, "rows : "+rows);
 
@@ -1322,6 +1366,94 @@ public class WifiReceiver extends BroadcastReceiver {
         Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
         SQLiteDatabase db = DBManager.getInstance().openDatabase();
         db.delete(DBHelper.appUsage_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
+    }
+
+    private void storeNotification(JSONObject data){
+
+        Log.d(TAG, "storeNotification");
+
+        try {
+
+            JSONObject appUsageAndtimestampsJson = new JSONObject();
+
+            JSONArray title_cols = new JSONArray();
+            JSONArray n_text_cols = new JSONArray();
+            JSONArray subText_cols = new JSONArray();
+            JSONArray tickerText_cols = new JSONArray();
+            JSONArray app_cols = new JSONArray();
+            JSONArray sendForm_cols = new JSONArray();
+            JSONArray longitude_cols = new JSONArray();
+            JSONArray latitude_cols = new JSONArray();
+            JSONArray timestamps = new JSONArray();
+
+            SQLiteDatabase db = DBManager.getInstance().openDatabase();
+            Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.notification_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
+//            Log.d(TAG,"SELECT * FROM "+DBHelper.accessibility_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+
+            int rows = transCursor.getCount();
+
+            Log.d(TAG, "rows : "+rows);
+
+            if(rows!=0){
+                transCursor.moveToFirst();
+                for(int i=0;i<rows;i++) {
+                    String timestamp = transCursor.getString(1);
+                    String title_col = transCursor.getString(2);
+                    String n_text_col = transCursor.getString(3);
+                    String subText_col = transCursor.getString(4);
+                    String tickerText_col = transCursor.getString(5);
+                    String app_col = transCursor.getString(6);
+                    String sendForm_col = transCursor.getString(7);
+                    String longitude_col = transCursor.getString(8);
+                    String latitude_col = transCursor.getString(9);
+
+//                    Log.d(TAG,"timestamp : "+timestamp+" pack : "+pack+" text : "+text+" type : "+type+" extra : "+extra);
+
+                    title_cols.put(title_col);
+                    n_text_cols.put(n_text_col);
+                    subText_cols.put(subText_col);
+                    tickerText_cols.put(tickerText_col);
+                    app_cols.put(app_col);
+                    sendForm_cols.put(sendForm_col);
+                    longitude_cols.put(longitude_col);
+                    latitude_cols.put(latitude_col);
+
+                    timestamps.put(timestamp);
+
+                    transCursor.moveToNext();
+                }
+
+                appUsageAndtimestampsJson.put("title_cols",title_cols);
+                appUsageAndtimestampsJson.put("n_text_cols",n_text_cols);
+                appUsageAndtimestampsJson.put("subText_cols",subText_cols);
+                appUsageAndtimestampsJson.put("tickerText_cols",tickerText_cols);
+                appUsageAndtimestampsJson.put("app_cols",app_cols);
+                appUsageAndtimestampsJson.put("sendForm_cols",sendForm_cols);
+                appUsageAndtimestampsJson.put("longitude_cols",longitude_cols);
+                appUsageAndtimestampsJson.put("latitude_cols",latitude_cols);
+//                appUsageAndtimestampsJson.put("Latest_Foreground_Activity",Latest_Foreground_Activitys);
+                appUsageAndtimestampsJson.put("timestamps",timestamps);
+
+                data.put("Notification",appUsageAndtimestampsJson);
+
+            }else
+                noDataFlag7 = true;
+
+        }catch (JSONException e){
+            e.printStackTrace();
+        }catch(NullPointerException e){
+            e.printStackTrace();
+        }
+
+        Log.d(TAG,"data : "+ data.toString());
+
+    }
+
+    private void deleteNotification(Long startTime, Long endTime) {
+        Log.d(TAG, "deleteNotification");
+        Log.d(TAG, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'");
+        SQLiteDatabase db = DBManager.getInstance().openDatabase();
+        db.delete(DBHelper.notification_table, DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime + "'", null);
     }
 
     private long getSpecialTimeInMillis(String givenDateFormat){
@@ -1472,4 +1604,6 @@ public class WifiReceiver extends BroadcastReceiver {
         long t = getSpecialTimeInMillis(year,month,day,Hour,Min);
         return t;
     }
+
+
 }

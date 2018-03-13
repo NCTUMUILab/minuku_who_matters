@@ -9,6 +9,7 @@ import edu.nctu.minuku.DBHelper.DBHelper;
 import edu.nctu.minuku.service.TransportationModeService;
 import edu.nctu.minuku_2.service.BackgroundService;
 import edu.nctu.minuku_2.service.NotificationListener;
+import edu.nctu.minuku.service.MobileAccessibilityService;
 
 /**
  * Created by Lawrence on 2017/7/19.
@@ -40,7 +41,7 @@ public class BootCompleteReceiver extends BroadcastReceiver {
 
                 Log.d(TAG, "Successfully receive reboot request");
 
-                //here we start the service
+//                here we start the service
 
                 Intent tintent = new Intent(context, TransportationModeService.class);
                 context.startService(tintent);
@@ -53,6 +54,10 @@ public class BootCompleteReceiver extends BroadcastReceiver {
                 Intent nintent = new Intent(context, NotificationListener.class);
                 context.startService(bintent);
                 Log.d(TAG,"NotificationListener is ok");
+
+                Intent mintent = new Intent(context, MobileAccessibilityService.class);
+                context.startService(mintent);
+                Log.d(TAG,"MobileAccessibilityService is ok");
 
             }
 

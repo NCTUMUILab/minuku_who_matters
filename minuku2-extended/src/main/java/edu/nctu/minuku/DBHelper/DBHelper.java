@@ -158,7 +158,7 @@ public class DBHelper extends SQLiteOpenHelper {
 
 
 
-    public static final String DATABASE_NAME = "MySQLite.db";
+    public static final String DATABASE_NAME = "MySQLite4.db";
     public static int DATABASE_VERSION = 1;
 
     private SQLiteDatabase db;
@@ -217,7 +217,9 @@ public class DBHelper extends SQLiteOpenHelper {
                 subText_col+" TEXT, " +
                 tickerText_col+" TEXT, " +
                 app_col+" TEXT, " +
-                sendForm_col+ " BOOLEAN" +
+                sendForm_col+ " BOOLEAN, " +
+                latitude_col+" FLOAT, "+
+                longitude_col +" FLOAT " +
                 ");";
 
         Log.d(TAG,"create Notification table" + cmd);

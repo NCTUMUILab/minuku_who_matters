@@ -2,6 +2,8 @@ package edu.nctu.minuku.service;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.content.Context;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 
@@ -11,6 +13,10 @@ import edu.nctu.minuku.manager.MinukuStreamManager;
 import edu.nctu.minuku.model.DataRecord.AccessibilityDataRecord;
 import edu.nctu.minuku.streamgenerator.AccessibilityStreamGenerator;
 import edu.nctu.minukucore.exception.StreamNotFoundException;
+import com.amplitude.api.Amplitude;
+import com.amplitude.api.Identify;
+
+import org.json.JSONObject;
 
 /**
  * Created by Lawrence on 2017/9/3.
@@ -18,7 +24,8 @@ import edu.nctu.minukucore.exception.StreamNotFoundException;
 
 public class MobileAccessibilityService extends AccessibilityService {
 
-    private final String TAG="MobileAccessibilityService";
+    private final String TAG="MobileAccessibilityServ";
+    String deviceId;
 
     private static AccessibilityStreamGenerator accessibilityStreamGenerator;
 
@@ -27,12 +34,19 @@ public class MobileAccessibilityService extends AccessibilityService {
     }
 
     public MobileAccessibilityService(AccessibilityStreamGenerator accessibilityStreamGenerator){
+
         super();
 
+//        Amplitude.getInstance().initialize(this, "5c53d03740fbc64a20da17140b911d6e");
+//        Identify identify = new Identify().set("DEVICE_ID", deviceId);
+//        Amplitude.getInstance().identify(identify);
+//        Amplitude.getInstance().logEvent("INIT_AccessibilityStreamGenerator");
         try {
             this.accessibilityStreamGenerator = (AccessibilityStreamGenerator) MinukuStreamManager.getInstance().getStreamGeneratorFor(AccessibilityDataRecord.class);
+//            Amplitude.getInstance().logEvent("AccessibilityStreamGenerator_GET_SUCCESS");
         }catch (StreamNotFoundException e){
             this.accessibilityStreamGenerator = accessibilityStreamGenerator;
+//            Amplitude.getInstance().logEvent("AccessibilityStreamGenerator_GET_FAILED");
             e.printStackTrace();
         }
 
@@ -51,6 +65,7 @@ public class MobileAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
+        Amplitude.getInstance().logEvent("onAccessibilityEvent");
         // TODO Auto-generated method stub
         int eventType = accessibilityEvent.getEventType();
         String pack = "";
@@ -59,8 +74,8 @@ public class MobileAccessibilityService extends AccessibilityService {
         String extra = "";
         long time = -1;
 
-        Log.d(TAG,"onAccessibilityEvent" + accessibilityEvent.toString());
-        Log.d(TAG, accessibilityEvent.getContentDescription().toString());
+//        Log.d(TAG,"onAccessibilityEvent" + accessibilityEvent.toString());
+//        Log.d(TAG, accessibilityEvent.getContentDescription().toString());
 
         if(accessibilityEvent.getPackageName()!=null){
             pack=accessibilityEvent.getPackageName().toString();
@@ -79,9 +94,11 @@ public class MobileAccessibilityService extends AccessibilityService {
             extra = accessibilityEvent.getContentDescription().toString();
             Log.d(TAG,"extra : "+ extra);
         }
+
+        Log.d(TAG, "eventType: "+ eventType);
         time = getCurrentTimeInMillis();
 
-//        Log.d(TAG,"event : " + accessibilityEvent.toString());
+        Log.d(TAG,"event : " + accessibilityEvent.toString());
 
         switch (eventType) {
              /*
@@ -169,9 +186,17 @@ public class MobileAccessibilityService extends AccessibilityService {
                 break;
         }
 
-//        Log.d(TAG,"pack = "+pack+" text = "+text+" type = "+type+" extra = "+extra);
+        Log.d(TAG,"pack = "+pack+" text = "+text+" type = "+type+" extra = "+extra);
+        try {
+            accessibilityStreamGenerator.setLatestInAppAction(pack, text, type, extra);
+//        if(!type.isEmpty()){
+            accessibilityStreamGenerator.updateStream();
+            Log.d(TAG, "update accessibilityStreamGenerator" );
+//        }
+        }catch (Exception e){
 
-        accessibilityStreamGenerator.setLatestInAppAction(pack, text, type, extra);
+        }
+
 
     }
 

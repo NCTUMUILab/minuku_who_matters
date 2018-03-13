@@ -30,6 +30,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcelable;
@@ -47,6 +48,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.WebChromeClient;
 import android.widget.Button;
 import android.widget.DatePicker;
 import android.widget.ImageView;
@@ -55,6 +57,10 @@ import android.widget.Toast;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.content.Context;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -95,9 +101,12 @@ import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
-
-
-
+import com.crashlytics.android.Crashlytics;
+import io.fabric.sdk.android.Fabric;
+import com.crashlytics.android.answers.Answers;
+import com.crashlytics.android.answers.ContentViewEvent;
+import com.amplitude.api.Amplitude;
+import com.amplitude.api.Identify;
 
 public class MainActivity extends AppCompatActivity {
     final static String CONNECTIVITY_ACTION = "android.net.conn.CONNECTIVITY_CHANGE";
@@ -110,6 +119,7 @@ public class MainActivity extends AppCompatActivity {
     WifiReceiver mWifiReceiver;
     IntentFilter intentFilter;
 
+
     private int mYear, mMonth, mDay;
 
     public static String task="PART"; //default is PART
@@ -120,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
     public static android.support.design.widget.TabLayout mTabs;
     public static ViewPager mViewPager;
 
-    private TextView device_id;
+    private String device_id;
     private TextView num_6_digit;
     private TextView user_id;
     private TextView sleepingtime;
@@ -166,13 +176,23 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        Amplitude.getInstance().initialize(this, "5c53d03740fbc64a20da17140b911d6e").enableForegroundTracking(getApplication());
+
         Log.d(TAG, "Creating Main activity");
+        device_id = getDeviceid();
+        // TODO: Use your own attributes to track content views in your app
+        Answers.getInstance().logContentView(new ContentViewEvent().putContentName("create mainactivity").putCustomAttribute("device_id", device_id));
+
 
         intentFilter = new IntentFilter();
         intentFilter.addAction(CONNECTIVITY_ACTION);
         mWifiReceiver = new WifiReceiver();
 
-        getDeviceid();
+
+        Identify identify = new Identify().set("DEVICE_ID", device_id);
+        Amplitude.getInstance().identify(identify);
+        Amplitude.getInstance().logEvent("MAIN_ACTIVITY_CREATE");
 
         if(!isNotificationServiceEnabled()) {
             Log.d(TAG, "notification start!!");
@@ -186,24 +206,20 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
-        t=new TextView(this);
 
-        t=(TextView)findViewById(R.id.deviceID);
-        t.setText(Constants.DEVICE_ID);
 
         final Button button_init_permission = (Button) findViewById(R.id.button_init_permission);
         button_init_permission.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 checkAndRequestPermissions();
                 startpermission();
-
             }
         });
 
+        checkAndRequestPermissions();
 
         Log.d(TAG," getString(R.string.sharedPreference) : " + getString(R.string.sharedPreference));
         sharedPrefs = getSharedPreferences(getString(R.string.sharedPreference), MODE_PRIVATE);
-
 
         firstTimeToShowDialogOrNot = sharedPrefs.getBoolean("firstTimeToShowDialogOrNot", true);
         Log.d(TAG,"firstTimeToShowDialogOrNot : "+firstTimeToShowDialogOrNot);
@@ -213,18 +229,32 @@ public class MainActivity extends AppCompatActivity {
             sharedPrefs.edit().putBoolean("firstTimeToShowDialogOrNot", firstTimeToShowDialogOrNot).apply();
         }
 
-
-
-
-
-
-
         startService(new Intent(getBaseContext(), BackgroundService.class));
         startService(new Intent(getBaseContext(), NotificationListener.class));
 //        startService(new Intent(getBaseContext(), ExpSampleMethodService.class));
 //        startService(new Intent(getBaseContext(), CheckpointAndReminderService.class));
 
         EventBus.getDefault().register(this);
+
+        mWebView = (WebView) findViewById(R.id.activity_main_webview);
+
+        WebViewClient mWebViewClient = new WebViewClient();
+
+        // Force links and redirects to open in the WebView instead of in a browser
+        mWebView.setWebViewClient(mWebViewClient);
+
+        // Enable Javascript
+        WebSettings webSettings = mWebView.getSettings();
+        webSettings.setJavaScriptEnabled(true);
+//        mWebView.setWebChromeClient(new WebChromeClient());
+
+
+        Intent intent = getIntent();
+        Bundle extras = intent.getExtras();
+        mWebView.loadUrl("http://who.nctu.me:8000/esm/report?device_id="+Constants.DEVICE_ID);
+        Log.d(TAG, "get url: " + mWebView.getUrl());
+
+        logUser();
 
         int sdk_int = Build.VERSION.SDK_INT;
         if(sdk_int>=23) {
@@ -411,14 +441,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public void getDeviceid(){
+    public String getDeviceid(){
 
         TelephonyManager mngr = (TelephonyManager)getSystemService(TELEPHONY_SERVICE);
         int permissionStatus= ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_PHONE_STATE);
         if(permissionStatus==PackageManager.PERMISSION_GRANTED){
             Constants.DEVICE_ID = mngr.getDeviceId();
+            sharedPrefs = getSharedPreferences(getString(R.string.sharedPreference), MODE_PRIVATE);
+            sharedPrefs.edit().putString("device_id", mngr.getDeviceId()).apply();
 
             Log.e(TAG,"DEVICE_ID"+Constants.DEVICE_ID+" : "+mngr.getDeviceId());
+            return mngr.getDeviceId();
 
             /*if(projName.equals("Ohio")) {
                device_id=(TextView)findViewById(R.id.deviceid);
@@ -427,6 +460,7 @@ public class MainActivity extends AppCompatActivity {
             }*/
 
         }
+        return "NA";
     }
 
     public void startServiceWork(){
@@ -446,6 +480,11 @@ public class MainActivity extends AppCompatActivity {
         }
 */
     }
+
+    private void logUser() {
+        Crashlytics.setUserIdentifier(Constants.DEVICE_ID);
+    }
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode,
