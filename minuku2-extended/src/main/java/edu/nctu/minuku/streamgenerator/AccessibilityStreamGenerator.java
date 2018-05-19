@@ -57,7 +57,7 @@ public class AccessibilityStreamGenerator extends AndroidStreamGenerator<Accessi
         } catch (SecurityException e){
             deviceId = "null";
         }
-        Amplitude.getInstance().initialize(this.mContext, "5c53d03740fbc64a20da17140b911d6e");
+        Amplitude.getInstance().initialize(this.mContext, "357d2125a984bc280669e6229646816c");
         Identify identify = new Identify().set("DEVICE_ID", deviceId);
         Amplitude.getInstance().identify(identify);
         Amplitude.getInstance().logEvent("INIT_AccessibilityStreamGenerator");

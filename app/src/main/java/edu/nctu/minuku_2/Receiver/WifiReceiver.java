@@ -73,7 +73,7 @@ public class WifiReceiver extends BroadcastReceiver {
     private final String TAG = "WifiReceiver";
     private Context mcontext;
     private String device_id;
-    private Integer UPDATE_FREQUENCY_MIN = 30;
+    private Integer UPDATE_FREQUENCY_MIN = 60;
 
     private Handler mDumpThread, mTripThread;
 
@@ -101,7 +101,7 @@ public class WifiReceiver extends BroadcastReceiver {
 
     private static final String PACKAGE_DIRECTORY_PATH="/Android/data/edu.nctu.minuku_2/";
 
-    private static final String postDumpUrl = "http://ec2-18-220-229-235.us-east-2.compute.amazonaws.com:8000/upload/";//&action=insert, search
+    private static final String postDumpUrl = "http://who.nctu.me:8000/upload/";//&action=insert, search
     private static final String postTripUrl = "http://192.168.10.93:5000/request?collection=trip";//&action=insert, search
 
     public static int mainThreadUpdateFrequencyInSeconds = 1800;
@@ -225,66 +225,79 @@ public class WifiReceiver extends BroadcastReceiver {
 //        }
 
         Amplitude.getInstance().logEvent("WIFI_START_DUMP_DATA");
-        while(getOldestDataTime()) {
+        int max_try = 100;
 
-            JSONObject data = new JSONObject();
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+                new SendHttpRequestTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR).get();
+            else
+                new SendHttpRequestTask().execute().get();
 
-            try {
-
-                data.put("device_id", device_id);
-
-
-                data.put("startTime", String.valueOf(startTime));
-                data.put("endTime", String.valueOf(endTime));
-                data.put("startTimeString", getTimeString(startTime));
-                data.put("endTimeString", getTimeString(endTime));
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-            storeTransporatation(data);
-            storeLocation(data);
-            storeActivityRecognition(data);
-            storeRinger(data);
-            storeConnectivity(data);
-            storeBattery(data);
-            storeAppUsage(data);
-
-            storeTelephony(data);
-            storeSensor(data);
-            storeAccessibility(data);
-            storeNotification(data);
-
-//            Log.d(TAG, "final data : " + data.toString());
-
-
-            String curr = getDateCurrentTimeZone(new Date().getTime());
-
-            //TODO upload to MongoDB
-            /*new HttpAsyncPostJsonTask().execute(postDumpUrl,
-                    data.toString(),
-                    "Dump",
-                    curr);*/
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-                    new HttpAsyncPostJsonTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR,
-                            postDumpUrl,
-                            data.toString(),
-                            "Dump",
-                            curr).get();
-                else
-                    new HttpAsyncPostJsonTask().execute(
-                            postDumpUrl,
-                            data.toString(),
-                            "Dump",
-                            curr).get();
-
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
         }
+
+//        while(getOldestDataTime() && max_try>0) {
+//            Amplitude.getInstance().logEvent("WHILE_1");
+//            max_try--;
+//            JSONObject data = new JSONObject();
+//
+//            try {
+//
+//                data.put("device_id", device_id);
+//                data.put("startTime", String.valueOf(startTime));
+//                data.put("endTime", String.valueOf(endTime));
+//                data.put("startTimeString", getTimeString(startTime));
+//                data.put("endTimeString", getTimeString(endTime));
+//            } catch (JSONException e) {
+//                e.printStackTrace();
+//            }
+//
+//            storeTransporatation(data);
+//            storeLocation(data);
+//            storeActivityRecognition(data);
+//            storeRinger(data);
+//            storeConnectivity(data);
+//            storeBattery(data);
+//            storeAppUsage(data);
+//
+//            storeTelephony(data);
+//            storeSensor(data);
+//            storeAccessibility(data);
+//            storeNotification(data);
+//
+////            Log.d(TAG, "final data : " + data.toString());
+//
+//
+//            String curr = getDateCurrentTimeZone(new Date().getTime());
+//
+//            //TODO upload to MongoDB
+//            /*new HttpAsyncPostJsonTask().execute(postDumpUrl,
+//                    data.toString(),
+//                    "Dump",
+//                    curr);*/
+//            try {
+//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+//                    new HttpAsyncPostJsonTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR,
+//                            postDumpUrl,
+//                            data.toString(),
+//                            "Dump",
+//                            curr).get();
+//                else
+//                    new HttpAsyncPostJsonTask().execute(
+//                            postDumpUrl,
+//                            data.toString(),
+//                            "Dump",
+//                            curr).get();
+//
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            } catch (ExecutionException e) {
+//                e.printStackTrace();
+//            }
+//        }
 
     }
 
@@ -361,6 +374,7 @@ public class WifiReceiver extends BroadcastReceiver {
     public String postJSON (String address, String json, String dataType, String lastSyncTime) {
 
         Log.d(TAG, "[postJSON] testbackend post data to " + address);
+        Amplitude.getInstance().logEvent("postJSON");
 
         InputStream inputStream = null;
         String result = "";
@@ -391,6 +405,7 @@ public class WifiReceiver extends BroadcastReceiver {
             conn.setRequestMethod("POST");
             conn.setDoInput(true);
             conn.setDoOutput(true);
+            conn.setConnectTimeout(5000);
             conn.setRequestProperty("Content-Type","application/json");
             conn.connect();
 
@@ -402,12 +417,23 @@ public class WifiReceiver extends BroadcastReceiver {
 
             int responseCode = conn.getResponseCode();
 
-            if(responseCode >= 400)
+            if(responseCode >= 400) {
                 inputStream = conn.getErrorStream();
+            }
             else
                 inputStream = conn.getInputStream();
 
             result = convertInputStreamToString(inputStream);
+
+            JSONObject responseJson = new JSONObject();
+            try {
+                responseJson.put("code", responseCode);
+                responseJson.put("result", result);
+            } catch (JSONException e) {
+
+            }
+
+            Amplitude.getInstance().logEvent("response", responseJson);
 
             Log.d(TAG, "[postJSON] the result response code is " + responseCode);
             Log.d(TAG, "[postJSON] the result is " + result);
@@ -418,21 +444,22 @@ public class WifiReceiver extends BroadcastReceiver {
                 Long r_startTime = obj.getLong("startTime");
                 Long r_endTime = obj.getLong("endTime");
 
-            deleteTransporatation(r_startTime, r_endTime);
-            deleteLocation(r_startTime, r_endTime);
-            deleteActivityRecognition(r_startTime, r_endTime);
-            deleteRinger(r_startTime, r_endTime);
-            deleteConnectivity(r_startTime, r_endTime);
-            deleteBattery(r_startTime, r_endTime);
-            deleteAppUsage(r_startTime, r_endTime);
-            deleteTelephony(r_startTime, r_endTime);
-            deleteSensor(r_startTime, r_endTime);
-            deleteAccessibility(r_startTime, r_endTime);
-            deleteNotification(r_startTime, r_endTime);
+//                deleteTransporatation(r_startTime, r_endTime);
+//                deleteLocation(r_startTime, r_endTime);
+//                deleteActivityRecognition(r_startTime, r_endTime);
+//                deleteRinger(r_startTime, r_endTime);
+//                deleteConnectivity(r_startTime, r_endTime);
+//                deleteBattery(r_startTime, r_endTime);
+//                deleteAppUsage(r_startTime, r_endTime);
+//                deleteTelephony(r_startTime, r_endTime);
+//                deleteSensor(r_startTime, r_endTime);
+//                deleteAccessibility(r_startTime, r_endTime);
+//                deleteNotification(r_startTime, r_endTime);
+                Amplitude.getInstance().logEvent("DELETE_SUCCESS");
 
 
             }catch (JSONException e){
-
+                Amplitude.getInstance().logEvent("DELETE_EXCEPTION");
             }
 
 
@@ -440,14 +467,19 @@ public class WifiReceiver extends BroadcastReceiver {
 
         }
         catch (NoSuchAlgorithmException e) {
+            Amplitude.getInstance().logEvent("NoSuchAlgorithmException");
             e.printStackTrace();
         } catch (KeyManagementException e) {
+            Amplitude.getInstance().logEvent("KeyManagementException");
             e.printStackTrace();
         } catch (ProtocolException e) {
+            Amplitude.getInstance().logEvent("ProtocolException");
             e.printStackTrace();
         } catch (MalformedURLException e) {
+            Amplitude.getInstance().logEvent("MalformedURLException");
             e.printStackTrace();
         } catch (IOException e) {
+            Amplitude.getInstance().logEvent("IOException");
             e.printStackTrace();
         }
 
@@ -523,9 +555,18 @@ public class WifiReceiver extends BroadcastReceiver {
             c.moveToFirst();
             v = c.getString(0);
             i = Long.parseLong(v);
+
+//            c = db.rawQuery("SELECT "+ DBHelper.TIME +" FROM "+ DBHelper.ringer_table + " LIMIT 1", null);
+//            c.moveToFirst();
+//            v = c.getString(0);
+//            i = Long.parseLong(v);
+
         } catch (Exception e){
+            Amplitude.getInstance().logEvent("getOldestDataTime_fail");
             return Boolean.FALSE;
         }
+
+        Log.d(TAG, "getOldestDataTime" + i.toString());
 
         if (System.currentTimeMillis() - i > UPDATE_FREQUENCY_MIN * 60 * 1000){
             Calendar calendar = Calendar.getInstance();
@@ -534,13 +575,143 @@ public class WifiReceiver extends BroadcastReceiver {
 //            calendar.set(Calendar.MINUTE, 0);
 //            Log.d(TAG, "after: "+  String.valueOf(calendar.getTimeInMillis()));
 //
-            startTime = calendar.getTimeInMillis();
+            startTime = calendar.getTimeInMillis()-(UPDATE_FREQUENCY_MIN * 60 * 1000);
             endTime = calendar.getTimeInMillis()+(UPDATE_FREQUENCY_MIN * 60 * 1000);
+            Log.d(TAG, "startTime: "+  String.valueOf(startTime));
+            Log.d(TAG, "endTime: "+  String.valueOf(endTime));
+            JSONObject data = new JSONObject();
+            try {
+                data.put("last_time", i);
+                data.put("startTime", startTime);
+                data.put("endTime", endTime);
+            } catch (JSONException e) {
+
+            }
+            Amplitude.getInstance().logEvent("getOldestDataTime", data);
+            Log.d(TAG, "getOldestDataTime TRUE");
             return Boolean.TRUE;
         }
         else{
-//            Log.d(TAG, "getOldestDataTime in one hour");
+//            Log.d(TAG, "getOldestDat/**/aTime in one hour");
+            Log.d(TAG, "getOldestDataTime FALSE");
             return Boolean.FALSE;
+        }
+    }
+
+
+
+    private class SendHttpRequestTask extends AsyncTask<String, Void, String> {
+        @Override
+        protected String doInBackground(String... params) {
+            HttpURLConnection connection = null;
+            android.util.Log.d(TAG, "SendHttpRequestTask");
+            Long created_at;
+            Boolean run_flag = Boolean.TRUE;
+            try {
+                while (run_flag) {
+                    URL url = new URL("http://who.nctu.me:8000/state/?user=" + device_id);
+                        connection = (HttpURLConnection) url.openConnection();
+                        connection.setRequestMethod("GET");//设置访问方式为“GET”
+                        connection.setConnectTimeout(8000);//设置连接服务器超时时间为8秒
+                        connection.setReadTimeout(8000);//设置读取服务器数据超时时间为8秒
+
+                        if (HttpURLConnection.HTTP_OK == connection.getResponseCode()) {
+
+                            InputStream in = connection.getInputStream();
+                            BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+
+                            StringBuilder response = new StringBuilder();
+                            String line;
+                            while (null != (line = reader.readLine())) {
+                                response.append(line);
+                            }
+                            android.util.Log.d(TAG, "GET RESULT");
+                            android.util.Log.d(TAG, response.toString());
+                            Long last_upload_time = Long.parseLong(response.toString());
+                            if (last_upload_time == 0){
+                                SQLiteDatabase db = DBManager.getInstance().openDatabase();
+                                try {
+                                    Cursor c = db.rawQuery("SELECT "+ DBHelper.TIME +" FROM "+ DBHelper.ringer_table + " LIMIT 1", null);
+                                    c.moveToFirst();
+                                    last_upload_time = Long.parseLong(c.getString(0));
+
+
+                                } catch (Exception e){
+
+                                }
+                            }
+
+                            if (System.currentTimeMillis() - last_upload_time > UPDATE_FREQUENCY_MIN * 60 * 1000) {
+                                Calendar calendar = Calendar.getInstance();
+                                calendar.setTimeInMillis(last_upload_time);
+
+                                startTime = last_upload_time;
+                                endTime = calendar.getTimeInMillis() + (UPDATE_FREQUENCY_MIN * 60 * 1000);
+                                long d_startTime = startTime - 1;
+                                long d_0 = 0;
+                                Log.d(TAG, "startTime: " + String.valueOf(startTime));
+                                Log.d(TAG, "endTime: " + String.valueOf(endTime));
+
+                                deleteTransporatation(d_0, d_startTime);
+                                deleteLocation(d_0, d_startTime);
+                                deleteActivityRecognition(d_0, d_startTime);
+                                deleteRinger(d_0, d_startTime);
+                                deleteConnectivity(d_0, d_startTime);
+                                deleteBattery(d_0, d_startTime);
+                                deleteAppUsage(d_0, d_startTime);
+                                deleteTelephony(d_0, d_startTime);
+                                deleteSensor(d_0, d_startTime);
+                                deleteAccessibility(d_0, d_startTime);
+                                deleteNotification(d_0, d_startTime);
+
+
+                                JSONObject data = new JSONObject();
+
+                                try {
+
+                                    data.put("device_id", device_id);
+                                    data.put("startTime", String.valueOf(startTime));
+                                    data.put("endTime", String.valueOf(endTime));
+                                    data.put("startTimeString", getTimeString(startTime));
+                                    data.put("endTimeString", getTimeString(endTime));
+                                } catch (JSONException e) {
+                                    e.printStackTrace();
+                                    run_flag = Boolean.FALSE;
+                                }
+
+                                storeTransporatation(data);
+                                storeLocation(data);
+                                storeActivityRecognition(data);
+                                storeRinger(data);
+                                storeConnectivity(data);
+                                storeBattery(data);
+                                storeAppUsage(data);
+
+                                storeTelephony(data);
+                                storeSensor(data);
+                                storeAccessibility(data);
+                                storeNotification(data);
+
+
+
+                                postJSON(postDumpUrl, data.toString(), "upload", "");
+
+                            } else {
+                                run_flag = Boolean.FALSE;
+                            }
+                        } else {
+                            run_flag = Boolean.FALSE;
+                        }
+
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                if (null != connection) {
+                    connection.disconnect();
+                }
+            }
+            return "";
         }
     }
 
@@ -625,7 +796,7 @@ public class WifiReceiver extends BroadcastReceiver {
 
             SQLiteDatabase db = DBManager.getInstance().openDatabase();
             Cursor transCursor = db.rawQuery("SELECT * FROM "+DBHelper.transportationMode_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ", null); //cause pos start from 0.
-//            Log.d(TAG,"SELECT * FROM "+DBHelper.transportationMode_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
+            Log.d(TAG,"SELECT * FROM "+DBHelper.transportationMode_table+" WHERE "+DBHelper.TIME+" BETWEEN"+" '"+startTime+"' "+"AND"+" '"+endTime+"' ");
 
             int rows = transCursor.getCount();
 

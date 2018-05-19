@@ -36,7 +36,7 @@ import edu.nctu.minuku_2.R;
 
 public class CheckpointAndReminderService extends Service {
 
-    private final String TAG = "CheckpointAndReminderService";
+    private final String TAG = "Checkpoint";
 
     private static final String PACKAGE_DIRECTORY_PATH="/Android/data/edu.nctu.minuku_2/";
 
@@ -156,7 +156,7 @@ public class CheckpointAndReminderService extends Service {
         if(CheckpointOrNot){
             //TODO reset the FSM in TransportationMode and lastConfirmedActivityType
             TransportationModeService.setCurrentState(TransportationModeService.STATE_STATIC);
-            TransportationModeService.setConfirmedActivityType(TransportationModeService.NO_ACTIVITY_TYPE);
+//            TransportationModeService.setConfirmedActivityType(TransportationModeService.NO_ACTIVITY_TYPE);
             lastConfirmedActivityType = "NA";
             CheckpointOrNot = false;
             checkpointCount--;

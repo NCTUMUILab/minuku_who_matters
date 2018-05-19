@@ -163,4 +163,10 @@ public class Constants {
 
     public static final String ACTIVITY_DELIMITER = ":";
 
+
+    public static final String PACKAGE_DIRECTORY_PATH="/Android/data/edu.nctu.minuku_2/";
+
+    public static final String ACTIVITY_CONFIDENCE_CONNECTOR = ":";
+
+    public final static String DATE_FORMAT_NOW_SLASH = "yyyy/MM/dd HH:mm:ss Z";
 }

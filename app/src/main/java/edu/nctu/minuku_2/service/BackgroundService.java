@@ -90,7 +90,7 @@ public class BackgroundService extends Service {
         } catch (SecurityException e){
             deviceId = "null";
         }
-        Amplitude.getInstance().initialize(this, "5c53d03740fbc64a20da17140b911d6e").enableForegroundTracking(getApplication());
+        Amplitude.getInstance().initialize(this, "357d2125a984bc280669e6229646816c").enableForegroundTracking(getApplication());
         Identify identify = new Identify().set("DEVICE_ID", deviceId);
         Amplitude.getInstance().identify(identify);
         Amplitude.getInstance().logEvent("INIT_BACKGROUND_SERVICE");
@@ -160,10 +160,10 @@ public class BackgroundService extends Service {
             Log.d(TAG, "updateStreamGenerators");
             streamManager.updateStreamGenerators();
             Amplitude.getInstance().logEvent("UPLOAD_updateStreamManagerRunnable");
-            ;
-
         }
     };
+
+
 
     @Override
     public void onDestroy() {

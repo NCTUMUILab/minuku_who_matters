@@ -26,7 +26,7 @@ android {
         minSdkVersion 19
         targetSdkVersion 24
         versionCode 1
-        versionName "1.0"
+        versionName "2.7"
         multiDexEnabled true
     }
     buildTypes {
@@ -59,7 +59,7 @@ dependencies {
     // https://mvnrepository.com/artifact/javax.mail/mail
     compile group: 'javax.mail', name: 'mail', version: '1.4.1'
 
-    compile project(':opencsv-3.10')
+//    compile project(':opencsv-3.10')
 
     //Bug reporting
 

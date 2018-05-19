@@ -1,15 +1,25 @@
 package edu.nctu.minuku.service;
 
+import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Environment;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.google.android.gms.location.DetectedActivity;
+import com.opencsv.CSVWriter;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -45,6 +55,7 @@ public class TransportationModeService extends Service {
     /**Table Name**/
     public static final String RECORD_TABLE_NAME_TRANSPORTATION = "Record_Table_Transportation";
 
+    public static final int STATE_INITIAL = -1;
     public static final int STATE_STATIC = 0;
     public static final int STATE_SUSPECTING_START = 1;
     public static final int STATE_CONFIRMED = 2;
@@ -54,9 +65,14 @@ public class TransportationModeService extends Service {
     private static final float CONFIRM_START_ACTIVITY_THRESHOLD_IN_VEHICLE = (float) 0.6;
     private static final float CONFIRM_START_ACTIVITY_THRESHOLD_ON_FOOT = (float)0.6;
     private static final float CONFIRM_START_ACTIVITY_THRESHOLD_ON_BICYCLE =(float) 0.6;
-    private static final float CONFIRM_STOP_ACTIVITY_THRESHOLD_IN_VEHICLE = (float)0.2;
-    private static final float CONFIRM_STOP_ACTIVITY_THRESHOLD_ON_FOOT = (float)0.1;
-    private static final float CONFIRM_STOP_ACTIVITY_THRESHOLD_ON_BICYCLE =(float) 0.2;
+    private static final float CONFIRM_STOP_ACTIVITY_THRESHOLD_IN_VEHICLE = (float)0.3; //0.2
+    private static final float CONFIRM_STOP_ACTIVITY_THRESHOLD_ON_FOOT = (float)0.3; //0.1
+    private static final float CONFIRM_STOP_ACTIVITY_THRESHOLD_ON_BICYCLE =(float) 0.3; //0.2
+
+    public static final int CONFIRM_START_ACTIVITY_Needed_Confidence = 40;
+    public static final int CONFIRM_STOP_ACTIVITY_Needed_Confidence = 40;
+    public static final int CANCEL_SUSPECT_Threshold = 95;
+    public static final int SWTICH_TO_NEW_ACTIVITY_Threshold = 95;
 
     /**label **/
     public static final String STRING_DETECTED_ACTIVITY_IN_VEHICLE = "in_vehicle";
@@ -72,12 +88,13 @@ public class TransportationModeService extends Service {
     public static final String TRANSPORTATION_MODE_NAME_IN_VEHICLE = STRING_DETECTED_ACTIVITY_IN_VEHICLE;
     public static final String TRANSPORTATION_MODE_NAME_ON_FOOT = STRING_DETECTED_ACTIVITY_ON_FOOT;
     public static final String TRANSPORTATION_MODE_NAME_ON_BICYCLE = STRING_DETECTED_ACTIVITY_ON_BICYCLE;
-    public static final String TRANSPORTATION_MODE_NAME_IN_NO_TRANSPORTATION = "static";
+    public static final String TRANSPORTATION_MODE_NAME_NO_TRANSPORTATION = "static";
+    public static final String TRANSPORTATION_MODE_NAME_NA = "NA";
 
     private static final long WINDOW_LENGTH_START_ACTIVITY_DEFAULT = 20 * Constants.MILLISECONDS_PER_SECOND;
     private static final long WINDOW_LENGTH_STOP_ACTIVITY_DEFAULT = 20 * Constants.MILLISECONDS_PER_SECOND;
-    private static final long WINDOW_LENGTH_START_ACTIVITY_IN_VEHICLE = 10 * Constants.MILLISECONDS_PER_SECOND; //TODO origin為20s
-    private static final long WINDOW_LENGTH_START_ACTIVITY_ON_FOOT = 20 * Constants.MILLISECONDS_PER_SECOND;
+    private static final long WINDOW_LENGTH_START_ACTIVITY_IN_VEHICLE = 20 * Constants.MILLISECONDS_PER_SECOND; //TODO origin為10s
+    private static final long WINDOW_LENGTH_START_ACTIVITY_ON_FOOT = 10 * Constants.MILLISECONDS_PER_SECOND;
     private static final long WINDOW_LENGTH_START_ACTIVITY_ON_BICYCLE = 20 * Constants.MILLISECONDS_PER_SECOND;
     private static final long WINDOW_LENGTH_STOP_ACTIVITY_IN_VEHICLE = 150 * Constants.MILLISECONDS_PER_SECOND;
     private static final long WINDOW_LENGTH_STOP_ACTIVITY_ON_FOOT = 30 * Constants.MILLISECONDS_PER_SECOND; //TODO origin為60s
@@ -87,7 +104,7 @@ public class TransportationModeService extends Service {
     private static final long WINDOW_LENGTH_TRANSITION_START_ACTIVITY_ON_FOOT = 10 * Constants.MILLISECONDS_PER_SECOND;
     private static final long WINDOW_LENGTH_TRANSITION_START_ACTIVITY_ON_BICYCLE = 10 * Constants.MILLISECONDS_PER_SECOND;
     private static final long WINDOW_LENGTH_TRANSITION_STOP_ACTIVITY_IN_VEHICLE = 75 * Constants.MILLISECONDS_PER_SECOND;
-    private static final long WINDOW_LENGTH_TRANSITION_STOP_ACTIVITY_ON_FOOT = 10 * Constants.MILLISECONDS_PER_SECOND; //TODO origin為15s
+    private static final long WINDOW_LENGTH_TRANSITION_STOP_ACTIVITY_ON_FOOT = 10 * Constants.MILLISECONDS_PER_SECOND;
     private static final long WINDOW_LENGTH_TRANSITION_STOP_ACTIVITY_ON_BICYCLE = 45 * Constants.MILLISECONDS_PER_SECOND;
 
     //the frequency of requesting google activity from the google play service
@@ -113,6 +130,9 @@ public class TransportationModeService extends Service {
     public static final int STILL = DetectedActivity.STILL;
     public static final int TILTING = DetectedActivity.TILTING;
 
+    private static ArrayList<ActivityRecognitionDataRecord> mActivityRecognitionRecords;
+
+
     /**Constant **/
     private static int mSuspectedStartActivityType = NO_ACTIVITY_TYPE;
     private static int mSuspectedStopActivityType = NO_ACTIVITY_TYPE;
@@ -120,20 +140,66 @@ public class TransportationModeService extends Service {
     private static long mSuspectTime = 0;
     private static int mCurrentState = STATE_STATIC;
 
-    public ActivityRecognitionStreamGenerator activityRecognitionStreamGenerator;
 
-    public static TransportationModeDataRecord toCheckFamiliarOrNotTransportationModeDataRecord;
-    public static TransportationModeDataRecord transportationModeDataRecordFromService;
+    private static final String PACKAGE_DIRECTORY_PATH="/Android/data/edu.nctu.minuku_2/";
+    private CSVWriter csv_writer = null;
 
+    private ActivityRecognitionDataRecord latest_activityRecognitionDataRecord;
 
     private static Context serviceInstance = null;
     private Context mContext;
 
     private ScheduledExecutorService mScheduledExecutorService;
-    public static final int TransportationMode_REFRESH_FREQUENCY = 10; //1s, 1000ms
+    public static final int TransportationMode_REFRESH_FREQUENCY = 5; //1s, 1000ms
     public static final int BACKGROUND_RECORDING_INITIAL_DELAY = 0;
+    private final int TransportationMode_ThreadSize = 1;
+
+    private SharedPreferences sharedPrefs;
 
     public TransportationModeService(){}
+
+
+    public void onDestroy(){
+        super.onDestroy();
+
+        Log.d(TAG, "onDestroy");
+
+        ServiceDestroying_StoreToCSV_onDestroy(new Date().getTime(), "TransportationMode.csv");
+        ServiceDestroying_StoreToCSV_onDestroy(new Date().getTime(), "TransportationState.csv");
+        ServiceDestroying_StoreToCSV_onDestroy(new Date().getTime(),  "windowdata.csv");
+
+        sharedPrefs.edit().putInt("CurrentState", mCurrentState).apply();
+        sharedPrefs.edit().putInt("ConfirmedActivityType", mConfirmedActivityType).apply();
+
+        mScheduledExecutorService.shutdown();
+    }
+
+    @Override
+    public void onTaskRemoved(Intent intent){
+        super.onTaskRemoved(intent);
+        Log.d(TAG, "onTaskRemoved");
+
+        ServiceDestroying_StoreToCSV_onTaskRemoved(new Date().getTime(), "TransportationMode.csv");
+        ServiceDestroying_StoreToCSV_onTaskRemoved(new Date().getTime(), "TransportationState.csv");
+        ServiceDestroying_StoreToCSV_onTaskRemoved(new Date().getTime(),  "windowdata.csv");
+
+        sharedPrefs.edit().putInt("CurrentState", mCurrentState).apply();
+        sharedPrefs.edit().putInt("ConfirmedActivityType", mConfirmedActivityType).apply();
+
+        mScheduledExecutorService.shutdown();
+    }
+
+    @Override
+    public void onLowMemory(){
+        super.onLowMemory();
+
+        ServiceDestroying_StoreToCSV_onLowMemory(new Date().getTime(), "TransportationMode.csv");
+        ServiceDestroying_StoreToCSV_onLowMemory(new Date().getTime(), "TransportationState.csv");
+        ServiceDestroying_StoreToCSV_onLowMemory(new Date().getTime(),  "windowdata.csv");
+
+        sharedPrefs.edit().putInt("CurrentState", mCurrentState).apply();
+        sharedPrefs.edit().putInt("ConfirmedActivityType", mConfirmedActivityType).apply();
+    }
 
     public void onCreate(){
         super.onCreate();
@@ -143,7 +209,12 @@ public class TransportationModeService extends Service {
 
         mContext = this;
 
-        mScheduledExecutorService = Executors.newScheduledThreadPool(TransportationMode_REFRESH_FREQUENCY);
+        mScheduledExecutorService = Executors.newScheduledThreadPool(TransportationMode_ThreadSize);
+
+        sharedPrefs = getSharedPreferences("edu.umich.minuku_2", MODE_PRIVATE);
+
+        mCurrentState = sharedPrefs.getInt("CurrentState", STATE_STATIC);
+        mConfirmedActivityType = sharedPrefs.getInt("ConfirmedActivityType", NO_ACTIVITY_TYPE);
 
     }
 
@@ -153,12 +224,11 @@ public class TransportationModeService extends Service {
 
     public int onStartCommand(Intent intent, int flags, int startId) {
         super.onStartCommand(intent, flags, startId);
-        Log.d("CheckFamiliarOrNotService", "[test service running] going to start the probe service, isServiceRunning:  " + isServiceRunning());
+        Log.d(TAG, "[test service running] going to start the probe service, isServiceRunning:  " + isServiceRunning());
 
         startService();
 
-        return START_STICKY;
-//        return START_REDELIVER_INTENT;
+        return START_REDELIVER_INTENT;
     }
 
     public void startService(){
@@ -180,64 +250,334 @@ public class TransportationModeService extends Service {
         @Override
         public void run() {
 
+            Log.d(TAG, "TransportationModeRunnable");
+
             try {
                 transportationModeStreamGenerator = (TransportationModeStreamGenerator) MinukuStreamManager.getInstance().getStreamGeneratorFor(TransportationModeDataRecord.class);
             }catch(StreamNotFoundException e){
                 Log.e(TAG,"transportationModeStreamGenerator haven't created yet.");
             }
 
-            //Log.e(TAG, String.valueOf(activityRecognitionStreamGenerator.getLastSavedRecord()));
             if(MinukuStreamManager.getInstance().getActivityRecognitionDataRecord()!=null){
-                //if (activityRecognitionStreamGenerator.getLastSavedRecord()!=null) { //maybe need to judge Location's record even "getLastSavedRecord()!=null" ?
 
-                ActivityRecognitionDataRecord recordPool = MinukuStreamManager.getInstance().getActivityRecognitionDataRecord();//activityRecognitionStreamGenerator.getLastSavedRecord();
-//                Log.e(TAG,"getID : "+recordPool.getID());
-                Log.e(TAG,"CreateTime:" + recordPool.getCreationTime()+ " MostProbableActivity:"+recordPool.getMostProbableActivity());
+                ActivityRecognitionDataRecord record = MinukuStreamManager.getInstance().getActivityRecognitionDataRecord();//activityRecognitionStreamGenerator.getLastSavedRecord();
 
-                if (recordPool!=null) {
-                    examineTransportation(recordPool);
-                    Log.e(TAG, "[testactivitylog] examine" +
-                            " transportation: " + examineTransportation(recordPool));
-                    Log.e(TAG, "[testactivitylog] transportation: " + getConfirmedActvitiyString());
+                if (record!=null) {
 
-                    //transportationModeDataRecordFromService =
-                    //       new TransportationModeDataRecord(getActivityNameFromType(examineTransportation(recordPool)));//;getConfirmedActvitiyString()
+                    //getting latest Transportation based on the incoming record
+                    examineTransportation(record);
+
+                    Log.d("ARService", "[test replay] test trip: after examine transportation the current activity is  is " + getConfirmedActvitiyString() + " the status is " + getCurrentState());
+
+                    // showTransportation(getConfirmedActivityString());
 
                     try {
                         transportationModeStreamGenerator.setTransportationModeDataRecord(getConfirmedActvitiyString());
 
-                        TransportationModeDataRecord transportationModeDataRecord = new TransportationModeDataRecord(getConfirmedActvitiyString());
-
-                        MinukuStreamManager.getInstance().setTransportationModeDataRecord(transportationModeDataRecord);
-//                    transportationModeDataRecordFromService = new TransportationModeDataRecord(getConfirmedActvitiyString());
                     }catch(Exception e){
                         e.printStackTrace();
                     }
                 }
+
+                sharedPrefs.edit().putInt("CurrentState", mCurrentState).apply();
+                sharedPrefs.edit().putInt("ConfirmedActivityType", mConfirmedActivityType).apply();
+
+                //write transportation mode record
+                TransportationMode_StoreToCSV(new Date().getTime(), latest_activityRecognitionDataRecord, getConfirmedActvitiyString(), mCurrentState);
+
+                if(record.getMostProbableActivity().getConfidence()!=999){ //conf == 999 means it didn't receive anything from AR
+                    latest_activityRecognitionDataRecord = record;
+
+                    latest_activityRecognitionDataRecord.getProbableActivities();
+
+                }
             }
             else
-                Log.e(TAG, "ActivityRecognition's Stream might not start working yet.");
+                Log.e(TAG, "TransportationMode's Stream might not start working yet.");
+
         }
     };
 
+    public static String getTimeString(long time){
+
+        SimpleDateFormat sdf_now = new SimpleDateFormat(Constants.DATE_FORMAT_NOW_SLASH);
+        String currentTimeString = sdf_now.format(time);
+
+        return currentTimeString;
+    }
+
+    private void showTransportation(String transportation){
+
+        Log.e(TAG,"showTransportation");
+
+        String local_transportation = transportation;
+
+        String NotificationText = "Current Transportation Mode: " + local_transportation;
+
+
+        NotificationManager mNotificationManager =
+                (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);//Context.
+        Notification.BigTextStyle bigTextStyle = new Notification.BigTextStyle();
+        bigTextStyle.setBigContentTitle("DMS");
+        bigTextStyle.bigText(NotificationText);
+
+        Notification note = null;
+
+        note = new Notification.Builder(mContext)
+                .setContentTitle(Constants.APP_NAME)
+                .setContentText(NotificationText)
+                .setStyle(bigTextStyle)
+                .setAutoCancel(true)
+                .build();
+
+        // using the same tag and Id causes the new notification to replace an existing one
+        mNotificationManager.notify(7, note); //String.valueOf(System.currentTimeMillis()),
+        note.flags = Notification.FLAG_AUTO_CANCEL;
+
+    }
+
+    public void ServiceDestroying_StoreToCSV_onDestroy(long timestamp, String sFileName){
+        Log.d(TAG,"ServiceDestroying_StoreToCSV_onDestroy");
+
+//        String sFileName = "..._.csv";
+
+        try{
+            File root = new File(Environment.getExternalStorageDirectory() + Constants.PACKAGE_DIRECTORY_PATH);
+            if (!root.exists()) {
+                root.mkdirs();
+            }
+
+            Log.d(TAG, "root : " + root);
+
+            csv_writer = new CSVWriter(new FileWriter(Environment.getExternalStorageDirectory()+Constants.PACKAGE_DIRECTORY_PATH+sFileName,true));
+
+            List<String[]> data = new ArrayList<String[]>();
+
+            String timeString = getTimeString(timestamp);
+
+            data.add(new String[]{String.valueOf(timestamp), timeString, "Service killed.(onDestroy)"});
+
+            csv_writer.writeAll(data);
+
+            csv_writer.close();
+
+        }catch (IOException e){
+            e.printStackTrace();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public void ServiceDestroying_StoreToCSV_onTaskRemoved(long timestamp, String sFileName){
+        Log.d(TAG,"ServiceDestroying_StoreToCSV_onTaskRemoved");
+
+//        String sFileName = "..._.csv";
+
+        try{
+            File root = new File(Environment.getExternalStorageDirectory() + Constants.PACKAGE_DIRECTORY_PATH);
+            if (!root.exists()) {
+                root.mkdirs();
+            }
+
+            Log.d(TAG, "root : " + root);
+
+            csv_writer = new CSVWriter(new FileWriter(Environment.getExternalStorageDirectory()+Constants.PACKAGE_DIRECTORY_PATH+sFileName,true));
+
+            List<String[]> data = new ArrayList<String[]>();
+
+            String timeString = getTimeString(timestamp);
+
+            data.add(new String[]{String.valueOf(timestamp), timeString, "Service killed.(onTaskRemoved)"});
+
+            csv_writer.writeAll(data);
+
+            csv_writer.close();
+
+        }catch (IOException e){
+            e.printStackTrace();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public void ServiceDestroying_StoreToCSV_onLowMemory(long timestamp, String sFileName){
+        Log.d(TAG,"ServiceDestroying_StoreToCSV_onLowMemory");
+
+//        String sFileName = "..._.csv";
+
+        try{
+            File root = new File(Environment.getExternalStorageDirectory() + Constants.PACKAGE_DIRECTORY_PATH);
+            if (!root.exists()) {
+                root.mkdirs();
+            }
+
+            Log.d(TAG, "root : " + root);
+
+            csv_writer = new CSVWriter(new FileWriter(Environment.getExternalStorageDirectory()+Constants.PACKAGE_DIRECTORY_PATH+sFileName,true));
+
+            List<String[]> data = new ArrayList<String[]>();
+
+            String timeString = getTimeString(timestamp);
+
+            data.add(new String[]{String.valueOf(timestamp), timeString, "Service killed.(onLowMemory)"});
+
+            csv_writer.writeAll(data);
+
+            csv_writer.close();
+
+        }catch (IOException e){
+            e.printStackTrace();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public void TransportationMode_StoreToCSV(long timestamp, ActivityRecognitionDataRecord latest_AR, String transportation, int currentstate){
+        Log.d(TAG,"TransportationMode_StoreToCSV");
+
+        String sFileName = "TransportationMode.csv";
+
+
+        //get location record
+        float lat=0;
+        float lng = 0;
+        float accuracy = 0;
+
+
+        if (MinukuStreamManager.getInstance().getLocationDataRecord()!=null) {
+            lat = MinukuStreamManager.getInstance().getLocationDataRecord().getLatitude();
+            lng = MinukuStreamManager.getInstance().getLocationDataRecord().getLongitude();
+            accuracy = MinukuStreamManager.getInstance().getLocationDataRecord().getAccuracy();
+        }
+
+
+        Boolean TransportationModefirstOrNot = sharedPrefs.getBoolean("TransportationModefirstOrNot", true);
+
+        try{
+            File root = new File(Environment.getExternalStorageDirectory() + Constants.PACKAGE_DIRECTORY_PATH);
+            if (!root.exists()) {
+                root.mkdirs();
+            }
+
+            Log.d(TAG, "root : " + root);
+
+            csv_writer = new CSVWriter(new FileWriter(Environment.getExternalStorageDirectory()+Constants.PACKAGE_DIRECTORY_PATH+sFileName,true));
+
+            List<String[]> data = new ArrayList<String[]>();
+
+            String timeString = getTimeString(timestamp);
+
+            String state = "";
+
+            if (mCurrentState == 0)
+                state = "STATE_STATIC";
+            else if (mCurrentState == 1){
+                state = "STATE_SUSPECTING_START";
+            }
+            else if (mCurrentState == 2){
+                state = "STATE_CONFIRMED";
+            }
+            else if (mCurrentState == 3){
+                state = "STATE_SUSPECTING_STOP";
+            }
+
+            String rec_AR_String = "";
+            String latest_AR_String = "";
+
+            if (latest_AR!=null){
+                for (int i=0; i<latest_AR.getProbableActivities().size(); i++){
+
+                    if (i!=0){
+                        latest_AR_String+=Constants.ACTIVITY_DELIMITER;
+                    }
+                    DetectedActivity activity =  latest_AR.getProbableActivities().get(i);
+                    latest_AR_String += ActivityRecognitionStreamGenerator.getActivityNameFromType(activity.getType());
+                    latest_AR_String += Constants.ACTIVITY_CONFIDENCE_CONNECTOR;
+                    latest_AR_String += activity.getConfidence();
+
+                }
+            }
+
+            if(TransportationModefirstOrNot) {
+                data.add(new String[]{"timestamp", "timeString", "received_AR", "latest_AR", "transportation", "state", "lat", "lng", "accuracy"});
+                sharedPrefs.edit().putBoolean("TransportationModefirstOrNot", false).apply();
+            }
+
+            //write transportation mode
+            data.add(new String[]{String.valueOf(timestamp), timeString, rec_AR_String, latest_AR_String, transportation, state, String.valueOf(lat), String.valueOf(lng), String.valueOf(accuracy)});
+
+            csv_writer.writeAll(data);
+
+            csv_writer.close();
+
+        }catch (Exception e){
+            e.printStackTrace();
+            android.util.Log.e(TAG, "exception", e);
+        }
+    }
+
+    public void TransportationState_StoreToCSV(long timestamp, String state, String activitySofar){
+        Log.d(TAG,"TransportationState_StoreToCSV");
+
+        String sFileName = "TransportationState.csv"; //Static.csv
+
+        try{
+            File root = new File(Environment.getExternalStorageDirectory() + Constants.PACKAGE_DIRECTORY_PATH);
+            if (!root.exists()) {
+                root.mkdirs();
+            }
+
+            Log.d(TAG, "root : " + root);
+
+            csv_writer = new CSVWriter(new FileWriter(Environment.getExternalStorageDirectory()+Constants.PACKAGE_DIRECTORY_PATH+sFileName,true));
+
+            List<String[]> data = new ArrayList<String[]>();
+
+            String timeString = getTimeString(timestamp);
+
+            data.add(new String[]{String.valueOf(timestamp), timeString, state, String.valueOf(activitySofar)});
+
+            csv_writer.writeAll(data);
+
+            csv_writer.close();
+
+        }catch (IOException e){
+            e.printStackTrace();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
     public int examineTransportation(ActivityRecognitionDataRecord activityRecognitionDataRecord){
-        //** eat ActivityRecognition and Timestamp to get
-        //List<DetectedActivity> probableActivities = record.getProbableActivities();
-        //long detectionTime = record.getTimestamp();
+
+        //if there's no existing activity type, we need to get activity from the shared preference
+        if (mConfirmedActivityType == NO_ACTIVITY_TYPE){
+            mConfirmedActivityType = sharedPrefs.getInt("ConfirmedActivityType", NO_ACTIVITY_TYPE);
+        }
+
+        if(mCurrentState == STATE_INITIAL){
+            mCurrentState = sharedPrefs.getInt("CurrentState", STATE_INITIAL);
+        }
+
+
+        if(activityRecognitionDataRecord.getProbableActivities()==null || activityRecognitionDataRecord.getProbableActivities().isEmpty()){
+            return -1;
+        }
 
         List<DetectedActivity> probableActivities = activityRecognitionDataRecord.getProbableActivities();
 
-        Log.d(TAG, "activityRecognitionDataRecord.getMostProbableActivity() : "+ activityRecognitionDataRecord.getMostProbableActivity());
+
+        Log.d(TAG, "[test replay] examine the incoming record.....for transportation " + activityRecognitionDataRecord.getDetectedtime()  +" : "+ activityRecognitionDataRecord.getProbableActivities().toString());
 
         long detectionTime = activityRecognitionDataRecord.getCreationTime();
 
-        //if in the static state, we try to suspect new activity
-        if (getCurrentState()==STATE_STATIC) {
+        //if in the static state or initial state, we try to suspect new activity
+        if (getCurrentState()==STATE_STATIC || getCurrentState()==STATE_INITIAL) {
 
             //if the detected activity is vehicle, bike or on foot, then we suspect the activity from now
             if (probableActivities.get(0).getType()== DetectedActivity.ON_BICYCLE ||
                     probableActivities.get(0).getType()== DetectedActivity.IN_VEHICLE ||
-                    probableActivities.get(0).getType()== DetectedActivity.ON_FOOT ) {
+                    probableActivities.get(0).getType()== DetectedActivity.ON_FOOT) {
 
                 //set current state to suspect stop
                 setCurrentState(STATE_SUSPECTING_START);
@@ -247,22 +587,38 @@ public class TransportationModeService extends Service {
 
                 //set suspect time
                 setSuspectTime(detectionTime);
-/*
-                LogManager.log(LogManager.LOG_TAG_ACTIVITY_RECOGNITION,
-                        LogManager.LOG_TAG_PROBE_TRANSPORTATION,
-                        "Suspect Start Transportation:\t" + getActivityNameFromType(getSuspectedStartActivityType()) + "\t" + "state:" + getStateName(getCurrentState()) );
-*/
+
+                TransportationState_StoreToCSV(new Date().getTime(), "STATE_SUSPECTING_START", getConfirmedActvitiyString());
             }
 
         }
         else if (getCurrentState()==STATE_SUSPECTING_START) {
+
+            //
+            if (probableActivities.get(0).getType() == getSuspectedStopActivityType() &&
+                    probableActivities.get(0).getConfidence() >= CANCEL_SUSPECT_Threshold) {
+
+                //back to static, cancel the suspection
+                setCurrentState(STATE_CONFIRMED);
+
+                setSuspectedStartActivityType(NO_ACTIVITY_TYPE);
+
+                TransportationState_StoreToCSV(new Date().getTime(), "STATE_CONFIRMED", getConfirmedActvitiyString());
+
+                return getConfirmedActivityType();
+            }
+
+            Log.d(TAG,"[test replay] in Suspect start, the suspected AR is " +getActivityNameFromType(getSuspectedStartActivityType()) );
             boolean isTimeToConfirm = checkTimeElapseOfLatestActivityFromSuspectPoint(detectionTime, getSuspectTime(), getWindowLengh(getSuspectedStartActivityType(), getCurrentState()) );
+
+            StoreToCSV(isTimeToConfirm, detectionTime);
 
             if (isTimeToConfirm) {
 
                 long startTime = detectionTime - getWindowLengh(getSuspectedStartActivityType(), getCurrentState());
                 long endTime = detectionTime;
-                boolean isNewTransportationModeConfirmed = confirmStartPossibleTransportation(getSuspectedStartActivityType(), getWindowData(startTime, endTime));
+                boolean isNewTransportationModeConfirmed = confirmStartPossibleTransportation(getSuspectedStartActivityType(), getWindowData(startTime, endTime),
+                        getWindowLengh(getSuspectedStartActivityType(), getCurrentState()));
 
                 if (isNewTransportationModeConfirmed) {
 
@@ -275,11 +631,9 @@ public class TransportationModeService extends Service {
 
                     //set the suspect time so that other class can access it.(Trip_startTime is when we think the transportation starts)
                     setSuspectTime(startTime);
-/*
-                    LogManager.log(LogManager.LOG_TAG_ACTIVITY_RECOGNITION,
-                            LogManager.LOG_TAG_PROBE_TRANSPORTATION,
-                            "Confirm Transportation:\t" +  getActivityNameFromType(getConfirmedActivityType())  + "\t" + "state:" + getStateName(getCurrentState()) );
-*/
+
+                    TransportationState_StoreToCSV(new Date().getTime(), "STATE_CONFIRMED", getConfirmedActvitiyString());
+
                     return getConfirmedActivityType();
                 }
                 //if the suspection is wrong, back to the static state
@@ -291,11 +645,9 @@ public class TransportationModeService extends Service {
                     setConfirmedActivityType(NO_ACTIVITY_TYPE);
 
                     setSuspectTime(0);
-/*
-                    LogManager.log(LogManager.LOG_TAG_ACTIVITY_RECOGNITION,
-                            LogManager.LOG_TAG_PROBE_TRANSPORTATION,
-                            "Cancel Suspection:\t" + "state:" + getStateName(getCurrentState()) );
-*/
+
+                    TransportationState_StoreToCSV(new Date().getTime(), "STATE_STATIC", getConfirmedActvitiyString());
+
                     return getConfirmedActivityType();
 
                 }
@@ -303,7 +655,9 @@ public class TransportationModeService extends Service {
         }
         //if in the confirmed state, we suspect whether users exit the activity
         else if (getCurrentState()==STATE_CONFIRMED) {
-            /** if the detected activity is vehicle, bike or on foot, then we suspect the activity from now**/
+
+            Log.d(TAG,"[test replay] in confirm, the confirm AR is " + getActivityNameFromType(getConfirmedActivityType()));
+            /** if the detected activity is vehicle, bike or on foot, then we suspect the activity from now **/
 
             //if the latest activity is not the currently confirmed activity nor tilting nor unkown
             if (probableActivities.get(0).getType() != getConfirmedActivityType() &&
@@ -316,135 +670,186 @@ public class TransportationModeService extends Service {
                 setSuspectedStopActivityType(getConfirmedActivityType());
                 //set suspect time
                 setSuspectTime(detectionTime);
-/*
-                LogManager.log(LogManager.LOG_TAG_ACTIVITY_RECOGNITION,
-                        LogManager.LOG_TAG_PROBE_TRANSPORTATION,
-                        "Suspect Stop Transportation:\t" +  getActivityNameFromType(getSuspectedStopActivityType())  + "\t" + "state:" + getStateName(getCurrentState()) );
-*/
+
+                TransportationState_StoreToCSV(new Date().getTime(), "STATE_SUSPECTING_STOP", getConfirmedActvitiyString());
+
             }
         }
         else if (getCurrentState()==STATE_SUSPECTING_STOP) {
-            //TODO change to the new constants.
-            //TODO for "getTransitionWindowLength"
-            //TODO If it is changing from unstatic to unstatic.
-            //TODO If it is changing from unstatic to static, it will choose the original constant.
+
             boolean isTimeToConfirm = checkTimeElapseOfLatestActivityFromSuspectPoint(detectionTime, getSuspectTime(),
-//                    getWindowLengh(getSuspectedStopActivityType(),
-                    getTransitionWindowLength(getSuspectedStopActivityType(),
-                            getCurrentState()) );
+                    getWindowLengh(getSuspectedStopActivityType(),
+                            getCurrentState())
+            );
 
-            if (isTimeToConfirm) {
-                //TODO change to the new constants
-                long startTime =detectionTime -
-//                        getWindowLengh(getSuspectedStartActivityType(),
-                        getTransitionWindowLength(getSuspectedStartActivityType(),
-                            getCurrentState());
-                long endTime = detectionTime;
-                boolean isExitingTransportationMode = confirmStopPossibleTransportation(getSuspectedStopActivityType(), getWindowData(startTime, endTime));
+            //if we see the original transportation label with a high confidence level, we cancel the suspect stop
+            if (probableActivities.get(0).getType() == getSuspectedStopActivityType() &&
+                    probableActivities.get(0).getConfidence() >= CANCEL_SUSPECT_Threshold) {
 
-                if (isExitingTransportationMode) {
-/*
-                    LogManager.log(LogManager.LOG_TAG_ACTIVITY_RECOGNITION,
-                            LogManager.LOG_TAG_PROBE_TRANSPORTATION,
-                            "Stop Transportation:\t" +  getActivityNameFromType(getSuspectedStopActivityType())  + "\t" + "state:" + getStateName(getCurrentState()) );
-*/
-                    //back to static
-                    setCurrentState(STATE_STATIC);
+                //back to static, cancel the suspection
+                setCurrentState(STATE_CONFIRMED);
 
-                    setConfirmedActivityType(NO_ACTIVITY_TYPE);
+                setSuspectedStartActivityType(NO_ACTIVITY_TYPE);
 
-                    setSuspectedStopActivityType(NO_ACTIVITY_TYPE);
+                TransportationState_StoreToCSV(new Date().getTime(), "STATE_CONFIRMED", getConfirmedActvitiyString());
 
-                    //set the suspect time so that other class can access it.(Trip_startTime is when we think the transportation starts)
-                    setSuspectTime(startTime);
-
-                }
-
-                //not exiting the confirmed activity
-                else {
-                    //back to static, cancel the suspection
-                    setCurrentState(STATE_CONFIRMED);
-
-                    setSuspectedStartActivityType(NO_ACTIVITY_TYPE);
-
-/*
-                    LogManager.log(LogManager.LOG_TAG_ACTIVITY_RECOGNITION,
-                            LogManager.LOG_TAG_PROBE_TRANSPORTATION,
-                            "Cancel Suspection:\t" +  "state:" + getStateName(getCurrentState()) );
-*/
-                }
-
-                setSuspectTime(0);
+                return getConfirmedActivityType();
             }
 
 
+            //the incoming label is not the confirmed transportation mode with a high confidence, so we need to check labels in a window time
+            else {
+
+
+                if (isTimeToConfirm) {
+                    long startTime =detectionTime -
+                            getWindowLengh(getSuspectedStartActivityType(),
+                                    getCurrentState())
+                            ;
+                    long endTime = detectionTime;
+                    boolean isExitingTransportationMode =
+                            confirmStopPossibleTransportation(getSuspectedStopActivityType(), getWindowData(startTime, endTime),
+                                    getWindowLengh(getSuspectedStartActivityType(), getCurrentState()));
+
+
+                    if (isExitingTransportationMode) {
+
+                        //back to static
+                        setCurrentState(STATE_STATIC);
+
+                        setConfirmedActivityType(NO_ACTIVITY_TYPE);
+
+                        setSuspectedStopActivityType(NO_ACTIVITY_TYPE);
+
+                        //set the suspect time so that other class can access it.(Trip_startTime is when we think the transportation starts)
+                        setSuspectTime(startTime);
+
+                        TransportationState_StoreToCSV(new Date().getTime(), "STATE_STATIC", getConfirmedActvitiyString());
+
+                    }
+                    //not exiting the confirmed activity
+                    else {
+                        //back to static, cancel the suspection
+                        setCurrentState(STATE_CONFIRMED);
+
+                        setSuspectedStartActivityType(NO_ACTIVITY_TYPE);
+
+                        TransportationState_StoreToCSV(new Date().getTime(), "STATE_CONFIRMED", getConfirmedActvitiyString());
+
+                    }
+
+                    setSuspectTime(0);
+                }
+            }
+
+
+            /**
+             * switch activity
+             */
 
             //or directly enter suspecting activity: if the current record is other type of transportation mode
             if (probableActivities.get(0).getType() != getSuspectedStopActivityType() &&
                     probableActivities.get(0).getType()!=DetectedActivity.TILTING &&
                     probableActivities.get(0).getType()!=DetectedActivity.STILL &&
-                    probableActivities.get(0).getType()!=DetectedActivity.UNKNOWN ) {
+                    probableActivities.get(0).getType()!=DetectedActivity.UNKNOWN &&
+                    //NA = 9
+                    probableActivities.get(0).getType()!=9) {
 
-                isTimeToConfirm = checkTimeElapseOfLatestActivityFromSuspectPoint(
-                        detectionTime,
-                        getSuspectTime(),
-                        //TODO change to the new constants
-//                        getWindowLengh(probableActivities.get(0).getType(),
-                          getTransitionWindowLength(probableActivities.get(0).getType(),
-                                STATE_SUSPECTING_START) );
+                //if the new Activity having the confidence over 95, changing to state confirm
+                if(probableActivities.get(0).getConfidence() > SWTICH_TO_NEW_ACTIVITY_Threshold){
 
-                if (isTimeToConfirm) {
-                    //TODO change to the new constants
-                    long startTime = detectionTime -
-//                            getWindowLengh(probableActivities.get(0).getType(),
-                            getTransitionWindowLength(probableActivities.get(0).getType(),
-                                    STATE_SUSPECTING_START) ;
-                    long endTime = detectionTime;
-                    boolean isActuallyStartingAnotherActivity = changeSuspectingTransportation(
-                            probableActivities.get(0).getType(),
-                            getWindowData(startTime, endTime));
+                    //change the state to Confirmed
+                    setCurrentState(STATE_CONFIRMED);
+                    //set confirmed activity type
+                    setConfirmedActivityType(probableActivities.get(0).getType());
+                    //no suspect
+                    setSuspectedStartActivityType(NO_ACTIVITY_TYPE);
 
-                    if (isActuallyStartingAnotherActivity) {
+                    //set the suspect time so that other class can access it.(Trip_startTime is when we think the transportation starts)
+                    setSuspectTime(detectionTime);
 
-                        //back to static
-                        setCurrentState(STATE_SUSPECTING_START);
+                    TransportationState_StoreToCSV(new Date().getTime(), "STATE_CONFIRMED", getConfirmedActvitiyString());
 
-                        setSuspectedStopActivityType(NO_ACTIVITY_TYPE);
+                    return getConfirmedActivityType();
+                }
 
-                        setSuspectedStartActivityType(probableActivities.get(0).getType());
+                //no label with high confidence, we need to check labels in a window time
+                else {
 
-                        //start suspecting new activity
-                        setSuspectTime(detectionTime);
+                    isTimeToConfirm = checkTimeElapseOfLatestActivityFromSuspectPoint(
+                            detectionTime,
+                            getSuspectTime(),
+                            getWindowLengh(probableActivities.get(0).getType(),
+                                    STATE_SUSPECTING_START) );
 
-/*
-                        LogManager.log(LogManager.LOG_TAG_ACTIVITY_RECOGNITION,
-                                LogManager.LOG_TAG_PROBE_TRANSPORTATION,
-                                "Suspect Start Transportation:\t" + getActivityNameFromType(getSuspectedStartActivityType()) + "\t" + "state:" + getStateName(getCurrentState()) );
-*/
+                    if (isTimeToConfirm) {
+                        long startTime = detectionTime -
+                                getWindowLengh(probableActivities.get(0).getType(),
+                                        STATE_SUSPECTING_START) ;
+                        long endTime = detectionTime;
+                        boolean isActuallyStartingAnotherActivity = changeSuspectingTransportation(
+                                probableActivities.get(0).getType(),
+                                getWindowData(startTime, endTime));
+
+                        if (isActuallyStartingAnotherActivity) {
+
+                            //back to static
+                            setCurrentState(STATE_SUSPECTING_START);
+
+                            setSuspectedStopActivityType(NO_ACTIVITY_TYPE);
+
+                            setSuspectedStartActivityType(probableActivities.get(0).getType());
+
+                            //start suspecting new activity
+                            setSuspectTime(detectionTime);
+
+                            TransportationState_StoreToCSV(new Date().getTime(), "STATE_SUSPECTING_START", getConfirmedActvitiyString());
+
+                        }
                     }
                 }
+
             }
         }
 
-
-        /** if transportation is requested, save transportation record **/
-/*        boolean isRequested = checkRequestStatusOfContextSource(STRING_CONTEXT_SOURCE_TRANSPORTATION);
-
-        if (isRequested){
-            saveRecordToLocalRecordPool();
-        }
-*/
         return getConfirmedActivityType();
-
 
     }
 
+    public void StoreToCSV(boolean isTimeToConfirm, long detectionTime){
+
+        String sFileName = "isTimeToConfirm.csv";
+
+        try{
+            File root = new File(Environment.getExternalStorageDirectory() + PACKAGE_DIRECTORY_PATH);
+            if (!root.exists()) {
+                root.mkdirs();
+            }
+
+            CSVWriter csv_writer = new CSVWriter(new FileWriter(Environment.getExternalStorageDirectory()+PACKAGE_DIRECTORY_PATH+sFileName,true));
+
+            List<String[]> data = new ArrayList<String[]>();
+
+            String timeString = getTimeString(new Date().getTime());
+
+            data.add(new String[]{String.valueOf(new Date().getTime()), timeString, String.valueOf(isTimeToConfirm), String.valueOf(detectionTime)});
+
+            csv_writer.writeAll(data);
+
+            csv_writer.close();
+
+        }catch (IOException e){
+            e.printStackTrace();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
 
     public static int getConfirmedActivityType() {
         return mConfirmedActivityType;
     }
 
-    public static void setConfirmedActivityType(int confirmedActivityType) {
+    public void setConfirmedActivityType(int confirmedActivityType) {
         mConfirmedActivityType = confirmedActivityType;
     }
 
@@ -486,12 +891,45 @@ public class TransportationModeService extends Service {
 
     public static boolean checkTimeElapseOfLatestActivityFromSuspectPoint( long lastestActivityTime, long suspectTime, long windowLenth) {
 
-        if (lastestActivityTime - suspectTime > windowLenth)
+        boolean flag = (lastestActivityTime - suspectTime > windowLenth); //(lastestActivityTime - suspectTime)*1000
+
+        StoreToCSV(new Date().getTime(), lastestActivityTime, suspectTime, lastestActivityTime - suspectTime ,windowLenth, flag);
+
+        if (flag)
             //wait for long enough
             return true;
         else
             //still need to wait
             return false;
+    }
+
+    public static void StoreToCSV(long timestamp, long lastestActivityTime, long suspectTime, long lastestActivityTime_suspectTime,long windowLenth, boolean flag){
+
+        String sFileName = "checkTimeToConfirm.csv";
+
+        try{
+            File root = new File(Environment.getExternalStorageDirectory() + PACKAGE_DIRECTORY_PATH);
+            if (!root.exists()) {
+                root.mkdirs();
+            }
+
+            CSVWriter csv_writer = new CSVWriter(new FileWriter(Environment.getExternalStorageDirectory()+PACKAGE_DIRECTORY_PATH+sFileName,true));
+
+            List<String[]> data = new ArrayList<String[]>();
+
+            String timeString = getTimeString(timestamp);
+
+            data.add(new String[]{String.valueOf(timestamp), timeString, String.valueOf(lastestActivityTime), String.valueOf(suspectTime), String.valueOf(lastestActivityTime_suspectTime), String.valueOf(windowLenth), String.valueOf(flag)});
+
+            csv_writer.writeAll(data);
+
+            csv_writer.close();
+
+        }catch (IOException e){
+            e.printStackTrace();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
     }
 
     public static long getTransitionWindowLength (int activityType, int state) {
@@ -566,7 +1004,8 @@ public class TransportationModeService extends Service {
 
     }
 
-    private static boolean confirmStartPossibleTransportation(int activityType, ArrayList<ActivityRecognitionDataRecord> windowData) {
+
+    private boolean confirmStartPossibleTransportation(int activityType, ArrayList<ActivityRecognitionDataRecord> windowData, long windowLength) {
 
         float threshold = getConfirmStartThreshold(activityType);
 
@@ -588,8 +1027,28 @@ public class TransportationModeService extends Service {
                 }
             }
 
-            if (detectedActivities.get(0).getType()==activityType ) {
-                count +=1;
+//            if (detectedActivities.get(0).getType()==activityType ) {
+//                count +=1;
+//            }
+
+            for (int activityIndex = 0; activityIndex<detectedActivities.size(); activityIndex++) {
+
+                //if probable activities contain the target activity, we count! (not simply see the most probable one)
+
+                if (detectedActivities.get(activityIndex).getType()==activityType
+                    //turned into getting the first two labels
+                    //also, we only care about the label which is much confidence to
+                    //prevent the low confidence ones would affect the result
+//                        && detectedActivities.get(activityIndex).getConfidence() >= CONFIRM_START_ACTIVITY_Needed_Confidence
+                        ){
+                    count +=1;
+                    break;
+                }
+
+                //only consider the first two labels
+                if(activityIndex >= 1){
+                    break;
+                }
             }
 
 
@@ -598,6 +1057,9 @@ public class TransportationModeService extends Service {
         if (windowData.size()!=0) {
 
             float percentage = (float)count/windowData.size();
+
+            StoreToCSV(new Date().getTime(), String.valueOf(percentage), "start", windowData, threshold, windowLength);
+
             //if the percentage > threshold
             if ( threshold <= percentage || inRecentCount >= 2)
                 return true;
@@ -605,14 +1067,60 @@ public class TransportationModeService extends Service {
                 return false;
 
         }
-        else
+        else{
+
+
+            StoreToCSV(new Date().getTime(), "no float", "start",new ArrayList<ActivityRecognitionDataRecord>(), threshold, windowLength);
+
             //if there's no data in the windowdata, we should not confirm the possible activity
             return false;
+        }
+    }
+
+    public void StoreToCSV(long timestamp, String percentage, String startstop, ArrayList<ActivityRecognitionDataRecord> windowData, float threshold, long windowLength){
+
+        String sFileName = "windowdata.csv";
+
+        try{
+            File root = new File(Environment.getExternalStorageDirectory() + PACKAGE_DIRECTORY_PATH);
+            if (!root.exists()) {
+                root.mkdirs();
+            }
+
+            CSVWriter csv_writer = new CSVWriter(new FileWriter(Environment.getExternalStorageDirectory()+PACKAGE_DIRECTORY_PATH+sFileName,true));
+
+            SharedPreferences sharedPrefs = mContext.getSharedPreferences("edu.umich.minuku_2", mContext.MODE_PRIVATE);
+            Boolean startwindowdataOrNot = sharedPrefs.getBoolean("startwindowdataOrNot", true);
+
+            if(startwindowdataOrNot) {
+                List<String[]> title = new ArrayList<String[]>();
+
+                title.add(new String[]{"timestamp", "timeString", "percentage", "startstop", "windowData", "threshold", "windowLength"});
+
+                csv_writer.writeAll(title);
+
+                sharedPrefs.edit().putBoolean("startwindowdataOrNot", false).apply();
+
+            }
+
+            List<String[]> data = new ArrayList<String[]>();
+
+            String timeString = getTimeString(timestamp);
+
+            data.add(new String[]{String.valueOf(timestamp), timeString, percentage, startstop,String.valueOf(windowData), String.valueOf(threshold), String.valueOf(windowLength)});
+
+            csv_writer.writeAll(data);
+
+            csv_writer.close();
+
+        }catch (IOException e){
+            e.printStackTrace();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
     }
 
     private static float getConfirmStartThreshold(int activityType) {
-
-        //TODO: different activity has different threshold
 
         switch (activityType) {
             case DetectedActivity.IN_VEHICLE:
@@ -654,7 +1162,7 @@ public class TransportationModeService extends Service {
         return windowData;
     }
 
-    private static boolean confirmStopPossibleTransportation(int activityType, ArrayList<ActivityRecognitionDataRecord> windowData) {
+    private boolean confirmStopPossibleTransportation(int activityType, ArrayList<ActivityRecognitionDataRecord> windowData, long windowLength) {
 
         float threshold = getConfirmStopThreshold(activityType);
 
@@ -677,26 +1185,44 @@ public class TransportationModeService extends Service {
             for (int activityIndex = 0; activityIndex<detectedActivities.size(); activityIndex++) {
 
                 //if probable activities contain the target activity, we count! (not simply see the most probable one)
-                if (detectedActivities.get(activityIndex).getType()==activityType ) {
+
+                if (detectedActivities.get(activityIndex).getType()==activityType
+                    //only consider the first two labels
+                    //also, we only care about the label which is much confidence to
+                    //prevent the low confidence ones would affect the result
+                    //&& detectedActivities.get(activityIndex).getConfidence() >= CONFIRM_STOP_ACTIVITY_Needed_Confidence
+                        ){
                     count +=1;
                     break;
                 }
+
+                //only consider the first two labels
+                if(activityIndex >= 1){
+                    break;
+                }
             }
+
         }
 
         float percentage = (float)count/windowData.size();
 
         if (windowData.size()!=0) {
             //if the percentage > threshold
+            StoreToCSV(new Date().getTime(), "stop", String.valueOf(percentage), windowData, threshold, windowLength);
+
             if ( threshold >= percentage && inRecentCount <= 2)
+
                 return true;
             else
                 return false;
 
         }
-        else
+        else{
+            StoreToCSV(new Date().getTime(), "no float", "stop", new ArrayList<ActivityRecognitionDataRecord>(), threshold, windowLength);
+
             //if there's no data in the windowdata, we should not confirm the possible activity
             return false;
+        }
     }
 
     private static boolean changeSuspectingTransportation(int activityType, ArrayList<ActivityRecognitionDataRecord> windowData) {
@@ -739,9 +1265,21 @@ public class TransportationModeService extends Service {
 
     }
 
-    private static float getConfirmStopThreshold(int activityType) {
+    public static void addActivityRecognitionRecord(ActivityRecognitionDataRecord record) {
+        getActivityRecognitionRecords().add(record);
+    }
 
-        //TODO: different activity has different threshold
+    public static ArrayList<ActivityRecognitionDataRecord> getActivityRecognitionRecords() {
+
+        if (mActivityRecognitionRecords==null){
+            mActivityRecognitionRecords = new ArrayList<ActivityRecognitionDataRecord>();
+        }
+        return mActivityRecognitionRecords;
+
+    }
+
+
+    private static float getConfirmStopThreshold(int activityType) {
 
         switch (activityType) {
             case DetectedActivity.IN_VEHICLE:
@@ -778,16 +1316,17 @@ public class TransportationModeService extends Service {
             case DetectedActivity.TILTING:
                 return ActivityRecognitionStreamGenerator.STRING_DETECTED_ACTIVITY_TILTING;
             case NO_ACTIVITY_TYPE:
-                return TRANSPORTATION_MODE_NAME_IN_NO_TRANSPORTATION;
+                return TRANSPORTATION_MODE_NAME_NO_TRANSPORTATION;
         }
-        return TRANSPORTATION_MODE_NAME_IN_NO_TRANSPORTATION;
+        return TRANSPORTATION_MODE_NAME_NO_TRANSPORTATION;
     }
 
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
+        Log.d(TAG,"onBind");
+
         return null;
     }
 }
-
 

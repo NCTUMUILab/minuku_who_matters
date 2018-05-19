@@ -27,6 +27,9 @@ import com.crashlytics.android.answers.Answers;
 import com.crashlytics.android.answers.ContentViewEvent;
 import com.amplitude.api.Amplitude;
 import android.webkit.WebChromeClient;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.widget.Toast;
 
 /**
  * Created by kevchentw on 2018/2/24.
@@ -38,12 +41,13 @@ public class ResultActivity extends AppCompatActivity {
     private String title = "";
     private SharedPreferences sharedPrefs;
     private String device_id;
+    private String app = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         device_id = getDeviceid();
-        Amplitude.getInstance().initialize(this, "5c53d03740fbc64a20da17140b911d6e").enableForegroundTracking(getApplication());
+        Amplitude.getInstance().initialize(this, "357d2125a984bc280669e6229646816c").enableForegroundTracking(getApplication());
 
         Identify identify = new Identify().set("DEVICE_ID", device_id);
         Amplitude.getInstance().identify(identify);
@@ -55,7 +59,7 @@ public class ResultActivity extends AppCompatActivity {
         sharedPrefs = getSharedPreferences(getString(R.string.sharedPreference), MODE_PRIVATE);
 
         setContentView(R.layout.activity_form);
-        
+
         mWebView = (WebView) findViewById(R.id.activity_form_webview);
 
 
@@ -67,6 +71,7 @@ public class ResultActivity extends AppCompatActivity {
                 super.onPageStarted(view, url, favicon);
                 Uri uri=Uri.parse(url);
                 title = uri.getQueryParameter("title");
+                app = uri.getQueryParameter("app");
 
                 Log.i("Listener~~", url);
                 if(url.contains("minuku_web")){
@@ -91,8 +96,13 @@ public class ResultActivity extends AppCompatActivity {
                     Amplitude.getInstance().logEvent("FINISH_FORM");
                     Answers.getInstance().logContentView(new ContentViewEvent().putContentName("form done").putCustomAttribute("device_id", Constants.DEVICE_ID));
                     sharedPrefs.edit().putString("last_title", title).apply();
-                    view.loadUrl("http://who.nctu.me:8000/esm/count?device_id="+ Constants.DEVICE_ID + "&name=" + title);
-
+                    view.loadUrl("http://who.nctu.me:8000/esm/count?device_id="+ Constants.DEVICE_ID + "&name=" + title + "&app=" + app);
+                    if(url.contains("minuku_web")){
+                        SharedPreferences pref = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE);
+                        pref.edit()
+                                .putLong("last_form_done_time", System.currentTimeMillis() / 1000L)
+                                .apply();
+                    }
                     return false;
                 }
                 else if(url.contains("who.nctu.me")){
@@ -103,15 +113,7 @@ public class ResultActivity extends AppCompatActivity {
             }
 
         };
-        final Button button_refresh = (Button) findViewById(R.id.button_refresh);
 
-        button_refresh.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                mWebView.reload();
-            }
-        });
-
-//        // Force links and redirects to open in the WebView instead of in a browser
         mWebView.setWebViewClient(mWebViewClient);
 
         // Enable Javascript
@@ -152,14 +154,38 @@ public class ResultActivity extends AppCompatActivity {
             Log.e(TAG,"DEVICE_ID"+Constants.DEVICE_ID+" : "+mngr.getDeviceId());
             return mngr.getDeviceId();
 
-            /*if(projName.equals("Ohio")) {
-               device_id=(TextView)findViewById(R.id.deviceid);
-               device_id.setText("ID = " + Constants.DEVICE_ID);
-
-            }*/
-
         }
         return "NA";
     }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_result, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_refresh) {
+            mWebView.reload();
+            return true;
+        }
+        else if (id == R.id.action_reset_form_time) {
+            SharedPreferences pref = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE);
+            pref.edit()
+                    .putLong("last_form_notification_sent_time", 0)
+                    .apply();
+            Context context = getApplicationContext();
+            CharSequence text = "已略過問卷，請按返回鍵離開問卷！";
+            int duration = Toast.LENGTH_SHORT;
+
+            Toast toast = Toast.makeText(context, text, duration);
+            toast.show();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
 
 }

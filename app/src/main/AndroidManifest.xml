@@ -233,6 +233,13 @@
         </receiver>
 
         <receiver
+            android:name="edu.nctu.minuku_2.Receiver.SnoozeReceiver"
+            android:enabled="true"
+            android:exported="true">
+        </receiver>
+
+
+        <receiver
             android:name="edu.nctu.minuku_2.Receiver.ConnectivityChangeReceiver"
             android:enabled="true">
             <intent-filter>

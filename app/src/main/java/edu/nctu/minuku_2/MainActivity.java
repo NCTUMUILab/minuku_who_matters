@@ -115,6 +115,8 @@ public class MainActivity extends AppCompatActivity {
     //private TextView compensationMessage;
     private AtomicInteger loadingProcessCount = new AtomicInteger(0);
     private ProgressDialog loadingProgressDialog;
+    private NotificationManager mManager;
+    private NotificationCompat.Builder mBuilder;
 
     WifiReceiver mWifiReceiver;
     IntentFilter intentFilter;
@@ -177,7 +179,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        Amplitude.getInstance().initialize(this, "5c53d03740fbc64a20da17140b911d6e").enableForegroundTracking(getApplication());
+        Amplitude.getInstance().initialize(this, "357d2125a984bc280669e6229646816c").enableForegroundTracking(getApplication());
 
         Log.d(TAG, "Creating Main activity");
         device_id = getDeviceid();
@@ -188,6 +190,9 @@ public class MainActivity extends AppCompatActivity {
         intentFilter = new IntentFilter();
         intentFilter.addAction(CONNECTIVITY_ACTION);
         mWifiReceiver = new WifiReceiver();
+        mManager = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
+        mBuilder = new NotificationCompat.Builder(this);
+
 
 
         Identify identify = new Identify().set("DEVICE_ID", device_id);
@@ -208,13 +213,13 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-        final Button button_init_permission = (Button) findViewById(R.id.button_init_permission);
-        button_init_permission.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                checkAndRequestPermissions();
-                startpermission();
-            }
-        });
+//        final Button button_init_permission = (Button) findViewById(R.id.button_init_permission);
+//        button_init_permission.setOnClickListener(new View.OnClickListener() {
+//            public void onClick(View v) {
+//                checkAndRequestPermissions();
+//                startpermission();
+//            }
+//        });
 
         checkAndRequestPermissions();
 
@@ -263,6 +268,16 @@ public class MainActivity extends AppCompatActivity {
             startServiceWork();
         }
 
+
+//        mBuilder.setSmallIcon(R.drawable.self_reflection)
+//                .setTicker("手機通知感知實驗運行中")
+//                .setContentTitle("實驗運行中")
+//                .setContentText("發展情境與聯絡人關係之自動感知手機通知系統")
+////                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+//                .setPriority(NotificationCompat.PRIORITY_MAX)
+//                .setOngoing(true);
+//        mManager.notify(666, mBuilder.build());
+
     }
 
     private boolean isNotificationServiceEnabled(){
@@ -282,6 +297,46 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return false;
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_get_permission) {
+            Context context = getApplicationContext();
+            CharSequence text = "如果是小米、Asus、Oppo 請開啟自啟動管理";
+            int duration = Toast.LENGTH_SHORT;
+
+            Toast toast = Toast.makeText(context, text, duration);
+            toast.show();
+            checkAndRequestPermissions();
+            startpermission();
+            return true;
+        }
+        else if (id == R.id.action_refresh) {
+            mWebView.reload();
+            return true;
+        }
+        else if (id == R.id.action_reset_form_time) {
+            SharedPreferences pref = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE);
+            pref.edit()
+                    .putLong("last_form_notification_sent_time", 0)
+                    .apply();
+            Context context = getApplicationContext();
+            CharSequence text = "已略過問卷，請按返回鍵離開問卷！";
+            int duration = Toast.LENGTH_SHORT;
+
+            Toast toast = Toast.makeText(context, text, duration);
+            toast.show();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private void toggleNotificationListenerService() {
@@ -711,6 +766,7 @@ public class MainActivity extends AppCompatActivity {
         public void destroyItem(ViewGroup container, int position, Object object) {
             container.removeView((View) object);
         }
+
 
     }
 

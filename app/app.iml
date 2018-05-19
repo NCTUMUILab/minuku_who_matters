@@ -147,6 +147,7 @@
     <orderEntry type="library" name="com.android.support:multidex-instrumentation-1.0.2" level="project" />
     <orderEntry type="library" name="com.google.android.gms:play-services-clearcut-9.2.1" level="project" />
     <orderEntry type="library" name="com.google.firebase:firebase-config-9.2.1" level="project" />
+    <orderEntry type="library" name="com.opencsv:opencsv:3.3@jar" level="project" />
     <orderEntry type="library" name="com.crashlytics.sdk.android:answers-1.4.1" level="project" />
     <orderEntry type="library" name="io.reactivex:rxjava:1.0.13@jar" level="project" />
     <orderEntry type="library" name="com.google.firebase:firebase-messaging-9.2.1" level="project" />
@@ -161,6 +162,7 @@
     <orderEntry type="library" name="com.android.support:support-core-utils-25.1.0" level="project" />
     <orderEntry type="library" name="com.google.android.gms:play-services-nearby-9.2.1" level="project" />
     <orderEntry type="library" name="io.fabric.sdk.android:fabric-1.4.2" level="project" />
+    <orderEntry type="library" name="org.apache.commons:commons-lang3:3.3.2@jar" level="project" />
     <orderEntry type="library" name="com.google.android.gms:play-services-places-9.2.1" level="project" />
     <orderEntry type="library" name="com.github.vipulasri:timelineview-1.0.5" level="project" />
     <orderEntry type="library" name="com.android.support:multidex-1.0.2" level="project" />
@@ -222,7 +224,6 @@
     <orderEntry type="library" name="com.google.android.gms:play-services-maps-9.2.1" level="project" />
     <orderEntry type="library" name="com.squareup.okhttp3:okhttp:3.9.0@jar" level="project" />
     <orderEntry type="library" name="com.google.android.gms:play-services-ads-lite-9.2.1" level="project" />
-    <orderEntry type="module" module-name="opencsv-3.10" />
     <orderEntry type="module" module-name="minukucore" />
     <orderEntry type="module" module-name="minuku2-extended" />
   </component>

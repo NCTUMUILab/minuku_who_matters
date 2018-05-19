@@ -2,13 +2,19 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
       xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_system_msg"
-        android:title="系統資訊"
-        android:icon="@android:drawable/ic_menu_save"
-        app:showAsAction="never" />
-    <item
         android:id="@+id/action_get_permission"
         android:title="獲取權限"
         android:icon="@android:drawable/ic_menu_my_calendar"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_refresh"
+        android:title="重新整理"
+        app:showAsAction="never" />
+
+
+    <item
+        android:id="@+id/action_reset_form_time"
+        android:title="略過問卷"
         app:showAsAction="never" />
 </menu>

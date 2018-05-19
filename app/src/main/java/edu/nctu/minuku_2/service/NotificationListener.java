@@ -34,6 +34,7 @@ import android.net.Uri;
 import edu.nctu.minuku.DBHelper.DBHelper;
 import edu.nctu.minuku.manager.DBManager;
 import edu.nctu.minuku_2.NotificationReceiver;
+import edu.nctu.minuku_2.Receiver.SnoozeReceiver;
 import org.json.JSONObject;
 import org.json.JSONException;
 import android.telephony.TelephonyManager;
@@ -57,7 +58,9 @@ import edu.nctu.minuku.streamgenerator.LocationStreamGenerator;
 import com.amplitude.api.Amplitude;
 import com.amplitude.api.Identify;
 import android.os.Handler;
-
+import java.util.UUID;
+import android.provider.Settings;
+import android.text.TextUtils;
 
 /**
  * Created by kevchentw on 2018/1/20.
@@ -76,6 +79,7 @@ public class NotificationListener extends NotificationListenerService {
     private String app;
     private Boolean send_form;
     private String last_title;
+    private Boolean skip_form;
 
     private SharedPreferences sharedPrefs;
 
@@ -90,11 +94,14 @@ public class NotificationListener extends NotificationListenerService {
 
     private static final class ApplicationPackageNames {
         public static final String FACEBOOK_MESSENGER_PACK_NAME = "com.facebook.orca";
+        public static final String MESSENGER_LITE_PACK_NAME = "com.facebook.mlite";
         public static final String LINE_PACK_NAME = "jp.naver.line.android";
+        public static final String LINE2_PACK_NAME = "jp.naver.line.androie";
     }
 
     public static final class InterceptedNotificationCode {
         public static final int FACEBOOK_MESSENGER_CODE = 1;
+        public static final int MESSENGER_LITE_CODE = 4;
         public static final int LINE_CODE = 2;
         public static final int OTHER_NOTIFICATIONS_CODE = 3;
     }
@@ -111,24 +118,11 @@ public class NotificationListener extends NotificationListenerService {
         SharedPreferences pref = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE);
 
         send_form = Boolean.FALSE;
+        skip_form = Boolean.FALSE;
         Log.d(TAG, "Notification received: "+sbn.getPackageName()+":"+sbn.getNotification().tickerText);
 
         Long last_form_done_time = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE)
                 .getLong("last_form_done_time", 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        );
-
-//        if(unixTime - last_form_done_time > 60*60){
-//            try {
-//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-//                    new SendHttpRequestTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR).get();
-//                else
-//                    new SendHttpRequestTask().execute().get();
-//
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            } catch (ExecutionException e) {
-//                e.printStackTrace();
-//            }
-//        }
 
 
 
@@ -162,6 +156,19 @@ public class NotificationListener extends NotificationListenerService {
         }
 
 
+
+        for (String key : notification.extras.keySet()) {
+            Object value = notification.extras.get(key);
+            try {
+                Log.d(TAG, String.format("%s %s (%s)", key,
+                        value.toString(), value.getClass().getName()));
+            } catch (Exception e) {
+
+            }
+
+        }
+
+
         TelephonyManager telephonyManager;
         telephonyManager = (TelephonyManager) getSystemService(Context.
                 TELEPHONY_SERVICE);
@@ -174,24 +181,52 @@ public class NotificationListener extends NotificationListenerService {
 
         int notificationCode = matchNotificationCode(sbn);
 
+        try {
+            SQLiteDatabase db = DBManager.getInstance().openDatabase();
+            values.put(DBHelper.TIME, new Date().getTime());
+            values.put(DBHelper.title_col, title);
+            values.put(DBHelper.n_text_col, text);
+            values.put(DBHelper.subText_col, subText);
+            values.put(DBHelper.tickerText_col, tickerText);
+            values.put(DBHelper.app_col, sbn.getPackageName());
+            values.put(DBHelper.sendForm_col, Boolean.FALSE);
+            values.put(DBHelper.longitude_col, (float)LocationStreamGenerator.longitude.get());
+            values.put(DBHelper.latitude_col, (float)LocationStreamGenerator.latitude.get());
+            Log.d(TAG, values.toString());
+            Log.d(TAG,"Save Notification_ALL");
+
+            db.insert(DBHelper.notification_table, null, values);
+            Amplitude.getInstance().logEvent("Notification_ALL");
+        } catch (NullPointerException e) {
+            e.printStackTrace();
+            Amplitude.getInstance().logEvent("Notification_ALL_FAILED");
+        } finally {
+            values.clear();
+            DBManager.getInstance().closeDatabase();
+        }
+
         if(notificationCode != InterceptedNotificationCode.OTHER_NOTIFICATIONS_CODE){
-            PendingIntent pi = PendingIntent.getActivity(this, 0, new Intent(this, edu.nctu.minuku_2.MainActivity.class), 0);
+            PendingIntent pi = PendingIntent.getActivity(this, UUID.randomUUID().hashCode(), new Intent(this, edu.nctu.minuku_2.MainActivity.class), 0);
 
 
-            if(sbn.getPackageName().equals(ApplicationPackageNames.FACEBOOK_MESSENGER_PACK_NAME)){
+            if(sbn.getPackageName().equals(ApplicationPackageNames.FACEBOOK_MESSENGER_PACK_NAME) || sbn.getPackageName().equals(ApplicationPackageNames.MESSENGER_LITE_PACK_NAME)){
                 app = "fb";
-                if(title.contains("聊天大頭貼使用中") || tickerText.contains("傳送了") || tickerText.contains("You missed a call from") || tickerText.contains("你錯過了") || tickerText.contains("sent") || tickerText.contains("reacted") || tickerText.contains("送了一張貼圖") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty() || text.contains("：") || text.contains(": ")){
-                    return;
+                if(sbn.getPackageName().equals(ApplicationPackageNames.MESSENGER_LITE_PACK_NAME)){
+                    app = "fb_lite";
+                }
+                if(tickerText.contains("對話中有新訊息") || title.contains("聊天大頭貼使用中") || tickerText.contains("傳送") || tickerText.contains("You missed a call from") || tickerText.contains("你錯過了") || tickerText.contains("sent") || tickerText.contains("reacted") || tickerText.contains("貼圖") || tickerText.contains("送出") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty() || text.contains("：") || text.contains(":")){
+                    skip_form = Boolean.TRUE;
+                    if(text.startsWith(title) && text.contains(":")){
+                        skip_form = Boolean.FALSE;
+                    }
                 }
             }
             else if(sbn.getPackageName().equals(ApplicationPackageNames.LINE_PACK_NAME)){
                 app = "line";
-                if(tickerText.contains("貼圖") ||  tickerText.contains("LINE系統") || tickerText.contains("您有新訊息") || title.contains("LINE未接來電") || title.contains("Missed LINE call") || text.contains("Incoming LINE voice call") ||  tickerText.contains("LINE未接來電") || title.contains("LINE語音通話來電中") || text.contains("LINE語音通話來電中") || tickerText.contains("傳送了") || tickerText.contains("記事本") || tickerText.contains("已建立")|| tickerText.contains("added a note") || tickerText.contains("sent") ||  tickerText.contains("語音訊息") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty() || !subText.isEmpty()){
-                    return;
+                if(tickerText.contains("You have a new message") || title.contains(" - ") || text.contains("邀請您加入") || title.contains("LINE") || tickerText.contains("LINE") || text.contains("LINE")  || tickerText.contains("貼圖") ||  tickerText.contains("LINE") || tickerText.contains("您有新訊息")  || tickerText.contains("傳送了") || tickerText.contains("記事本") || tickerText.contains("已建立")|| tickerText.contains("added a note") || tickerText.contains("sent") ||  tickerText.contains("語音訊息") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty() || !subText.isEmpty()){
+                    skip_form = Boolean.TRUE;
                 }
             }
-
-
 
             JSONObject manJson = new JSONObject();
             try{
@@ -225,12 +260,12 @@ public class NotificationListener extends NotificationListenerService {
             notificationIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                     | Intent.FLAG_ACTIVITY_CLEAR_TASK);
 
-            PendingIntent formIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+            PendingIntent formIntent = PendingIntent.getActivity(this, UUID.randomUUID().hashCode(), notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
+            Intent snoozeIntent = new Intent(this, SnoozeReceiver.class);
+            snoozeIntent.setAction("ACTION_SNOOZE");
 
-            Intent buttonIntent = new Intent(this, NotificationReceiver.class);
-            buttonIntent.putExtra("notificationId", 0);
-            PendingIntent btPendingIntent = PendingIntent.getBroadcast(this, 0, buttonIntent,0);
+            PendingIntent btPendingIntent = PendingIntent.getBroadcast(this, UUID.randomUUID().hashCode(), snoozeIntent,0);
 
 
             mManager = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -268,14 +303,38 @@ public class NotificationListener extends NotificationListenerService {
 
             }
 
-            Amplitude.getInstance().logEvent("READY_TO_SEND_FORM");
-            if(Boolean.TRUE || !title.equals(last_title) && (unixTime - last_form_notification_sent_time > 300) && (unixTime - last_form_done_time > 60*60)) {
+            isAccessibilityEnabled();
+
+            Amplitude.getInstance().logEvent("READY_TO_SEND_FORM", amplitudeJson);
+            if(!skip_form && !title.equals(last_title) && (unixTime - last_form_notification_sent_time > 600) && (unixTime - last_form_done_time > 45*60)) {
+                try {
+                    SQLiteDatabase db = DBManager.getInstance().openDatabase();
+                    values.put(DBHelper.TIME, new Date().getTime());
+                    values.put(DBHelper.title_col, title);
+                    values.put(DBHelper.n_text_col, text);
+                    values.put(DBHelper.subText_col, subText);
+                    values.put(DBHelper.tickerText_col, tickerText);
+                    values.put(DBHelper.app_col, sbn.getPackageName());
+                    values.put(DBHelper.sendForm_col, Boolean.TRUE);
+                    values.put(DBHelper.longitude_col, (float)LocationStreamGenerator.longitude.get());
+                    values.put(DBHelper.latitude_col, (float)LocationStreamGenerator.latitude.get());
+                    Log.d(TAG, values.toString());
+                    Log.d(TAG,"Save Notification WITH_FORM");
+
+                    db.insert(DBHelper.notification_table, null, values);
+                    Amplitude.getInstance().logEvent("SAVE_NOTIFICATION_WITH_FORM");
+                } catch (NullPointerException e) {
+                    e.printStackTrace();
+                    Amplitude.getInstance().logEvent("SAVE_NOTIFICATION_FAILED");
+                } finally {
+                    values.clear();
+                    DBManager.getInstance().closeDatabase();
+                }
                 Amplitude.getInstance().logEvent("SUCCESS_SEND_FORM");
                 pref.edit()
                         .putLong("last_form_notification_sent_time", unixTime)
                         .apply();
                 mBuilder.setSmallIcon(R.drawable.self_reflection)
-//                        .addAction(android.R.drawable.arrow_up_float, "填寫問卷", formIntent)
                         .addAction(android.R.drawable.arrow_down_float, "略過", btPendingIntent)
                         .setTicker("(" + app + ") " + tickerText)
                         .setContentTitle("請填寫問卷")
@@ -311,64 +370,10 @@ public class NotificationListener extends NotificationListenerService {
                         mManager.cancel(0);
                     }
                 }, delayInMilliseconds);
-
-//                new Thread(
-//                        new Runnable() {
-//                            @Override
-//                            public void run() {
-//                                int incr;
-//
-//                                // Do the "lengthy" operation 20 times
-//                                for (incr = 0; incr <= 60; incr+=1) {
-//                                    // Sets the progress indicator to a max value, the
-//                                    // current completion percentage, and "determinate"
-//                                    // state
-//                                    mBuilder.setProgress(60, incr, false);
-//                                    // Displays the progress bar for the first time.
-//                                    mManager.notify(0, mBuilder.build());
-//                                    // Sleeps the thread, simulating an operation
-//                                    // that takes time
-//                                    try {
-//                                        Thread.sleep(5000);
-//                                    } catch (InterruptedException e) {
-//                                        Log.d(TAG, "sleep failure");
-//                                    }
-//                                }
-////                                // When the loop is finished, updates the notification
-////                                mBuilder.setContentText("Download complete")
-////                                        // Removes the progress bar
-////                                        .setProgress(0,0,false);
-////                                mManager.notify(0, mBuilder.build());
-//                                mManager.cancel(0);
-//                            }
-//                        }
-//// Starts the thread by calling the run() method in its Runnable
-//                ).start();
-
             }
         }
 
-        try {
-            SQLiteDatabase db = DBManager.getInstance().openDatabase();
-            values.put(DBHelper.TIME, new Date().getTime());
-            values.put(DBHelper.title_col, title);
-            values.put(DBHelper.n_text_col, text);
-            values.put(DBHelper.subText_col, subText);
-            values.put(DBHelper.tickerText_col, tickerText);
-            values.put(DBHelper.app_col, sbn.getPackageName());
-            values.put(DBHelper.sendForm_col, send_form);
-            values.put(DBHelper.longitude_col, (float)LocationStreamGenerator.longitude.get());
-            values.put(DBHelper.latitude_col, (float)LocationStreamGenerator.latitude.get());
-            Log.d(TAG, values.toString());
-            Log.d(TAG,"Save Notification");
 
-            db.insert(DBHelper.notification_table, null, values);
-        } catch (NullPointerException e) {
-            e.printStackTrace();
-        } finally {
-            values.clear();
-            DBManager.getInstance().closeDatabase();
-        }
 
     }
 
@@ -384,6 +389,12 @@ public class NotificationListener extends NotificationListenerService {
         else if(packageName.equals(ApplicationPackageNames.LINE_PACK_NAME)){
             return(InterceptedNotificationCode.LINE_CODE);
         }
+        else if(packageName.equals(ApplicationPackageNames.LINE2_PACK_NAME)){
+            return(InterceptedNotificationCode.LINE_CODE);
+        }
+        else if(packageName.equals(ApplicationPackageNames.MESSENGER_LITE_PACK_NAME)){
+            return(InterceptedNotificationCode.MESSENGER_LITE_CODE);
+        }
         else{
             return(InterceptedNotificationCode.OTHER_NOTIFICATIONS_CODE);
         }
@@ -397,7 +408,7 @@ public class NotificationListener extends NotificationListenerService {
             SharedPreferences pref = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE);
             Long created_at;
             try {
-                URL url = new URL("http://ec2-18-220-229-235.us-east-2.compute.amazonaws.com:8000/last_form/?user=" + deviceId);
+                URL url = new URL("http://who.nctu.me:8000/last_form/?user=" + deviceId);
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("GET");//设置访问方式为“GET”
                 connection.setConnectTimeout(8000);//设置连接服务器超时时间为8秒
@@ -426,8 +437,6 @@ public class NotificationListener extends NotificationListenerService {
                     }catch (JSONException e){
 
                     }
-
-
                     return response.toString();
                 }
             } catch (Exception e) {
@@ -445,5 +454,57 @@ public class NotificationListener extends NotificationListenerService {
 
         }
     }
-}
 
+    public boolean isAccessibilityEnabled(){
+        int accessibilityEnabled = 0;
+        final String service = "edu.nctu.minuku_2/edu.nctu.minuku.service.MobileAccessibilityService";
+
+        boolean accessibilityFound = false;
+        try {
+            accessibilityEnabled = Settings.Secure.getInt(this.getContentResolver(),android.provider.Settings.Secure.ACCESSIBILITY_ENABLED);
+            Log.d(TAG, "ACCESSIBILITY: " + accessibilityEnabled);
+        } catch (Exception e) {
+            Log.d(TAG, "Error finding setting, default accessibility to not found: " + e.getMessage());
+        }
+
+        TextUtils.SimpleStringSplitter mStringColonSplitter = new TextUtils.SimpleStringSplitter(':');
+
+        if (accessibilityEnabled==1){
+            Log.d(TAG, "***ACCESSIBILIY IS ENABLED***: ");
+
+
+            String settingValue = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            Log.d(TAG, "Setting: " + settingValue);
+            if (settingValue != null) {
+                TextUtils.SimpleStringSplitter splitter = mStringColonSplitter;
+                splitter.setString(settingValue);
+                while (splitter.hasNext()) {
+                    String accessabilityService = splitter.next();
+                    Log.d(TAG, "Setting: " + accessabilityService);
+                    if (accessabilityService.equalsIgnoreCase(service)){
+                        Log.d(TAG, "We've found the correct setting - accessibility is switched on!");
+                        mManager.cancel(1);
+                        return true;
+                    }
+                }
+            }
+
+            Log.d(TAG, "***END***");
+        }
+        else{
+            Log.d(TAG, "***ACCESSIBILIY IS DISABLED***");
+            mBuilder.setSmallIcon(R.drawable.self_reflection)
+                    .setTicker("權限有誤，請重新獲取權限")
+                    .setContentTitle("權限有誤，請重新獲取權限")
+                    .setContentText("進入App，點選「獲取權限」")
+                    .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                    .setPriority(NotificationCompat.PRIORITY_MAX)
+                    .setWhen(System.currentTimeMillis())
+                    .setAutoCancel(true)
+                    .setOngoing(true);
+            mManager.notify(1, mBuilder.build());
+
+        }
+        return accessibilityFound;
+    }
+}

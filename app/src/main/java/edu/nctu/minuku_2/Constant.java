@@ -25,7 +25,4 @@ public class Constant {
 
     public static boolean tabpos = false;
 
-    public static final String ACTIVITY_DELIMITER = ":";
-
-
 }
