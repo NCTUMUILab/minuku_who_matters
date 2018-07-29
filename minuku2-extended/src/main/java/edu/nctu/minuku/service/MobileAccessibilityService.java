@@ -3,6 +3,7 @@ package edu.nctu.minuku.service;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
@@ -65,7 +66,11 @@ public class MobileAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
-        Amplitude.getInstance().logEvent("onAccessibilityEvent");
+//        Amplitude.getInstance().logEvent("onAccessibilityEvent");
+        SharedPreferences pref = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE);
+        pref.edit()
+                .putLong("state_accessibility", System.currentTimeMillis() / 1000L)
+                .apply();
         // TODO Auto-generated method stub
         int eventType = accessibilityEvent.getEventType();
         String pack = "";

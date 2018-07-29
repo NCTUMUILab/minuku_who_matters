@@ -178,8 +178,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        Amplitude.getInstance().initialize(this, "357d2125a984bc280669e6229646816c").enableForegroundTracking(getApplication());
+        SharedPreferences pref = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE);
+        pref.edit()
+                .putLong("state_main", System.currentTimeMillis() / 1000L)
+                .apply();
+//        Amplitude.getInstance().initialize(this, "357d2125a984bc280669e6229646816c").enableForegroundTracking(getApplication());
 
         Log.d(TAG, "Creating Main activity");
         device_id = getDeviceid();
@@ -195,9 +198,9 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-        Identify identify = new Identify().set("DEVICE_ID", device_id);
-        Amplitude.getInstance().identify(identify);
-        Amplitude.getInstance().logEvent("MAIN_ACTIVITY_CREATE");
+//        Identify identify = new Identify().set("DEVICE_ID", device_id);
+//        Amplitude.getInstance().identify(identify);
+//        Amplitude.getInstance().logEvent("MAIN_ACTIVITY_CREATE");
 
         if(!isNotificationServiceEnabled()) {
             Log.d(TAG, "notification start!!");
@@ -249,6 +252,9 @@ public class MainActivity extends AppCompatActivity {
         mWebView.setWebViewClient(mWebViewClient);
 
         // Enable Javascript
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//            mWebView.getSettings().setSafeBrowsingEnabled(false);
+//        }
         WebSettings webSettings = mWebView.getSettings();
         webSettings.setJavaScriptEnabled(true);
 //        mWebView.setWebChromeClient(new WebChromeClient());

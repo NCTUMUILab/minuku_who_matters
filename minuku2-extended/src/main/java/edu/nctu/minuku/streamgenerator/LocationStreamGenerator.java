@@ -23,6 +23,7 @@
 package edu.nctu.minuku.streamgenerator;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.location.Location;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -123,7 +124,7 @@ public class LocationStreamGenerator extends AndroidStreamGenerator<LocationData
         this.context = applicationContext;
 //        tripManager = new TripManager();
 
-        createCSV();
+//        createCSV();
 
         this.register();
     }
@@ -299,6 +300,10 @@ public class LocationStreamGenerator extends AndroidStreamGenerator<LocationData
                     + location.getLatitude() + ", "
                     + location.getLongitude() + ", "
                     + "accuracy: " + location.getAccuracy());
+            SharedPreferences pref = context.getSharedPreferences("edu.nctu.minuku", context.MODE_PRIVATE);
+            pref.edit()
+                    .putLong("state_gps", System.currentTimeMillis() / 1000L)
+                    .apply();
 
             // If the location is accurate to 30 meters, it's good enough for us.
             // Post an update event and exit. //TODO maybe be

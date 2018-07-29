@@ -3,6 +3,7 @@ package edu.nctu.minuku_2;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.util.Log;
 
 import edu.nctu.minuku.DBHelper.DBHelper;
@@ -10,6 +11,7 @@ import edu.nctu.minuku.service.TransportationModeService;
 import edu.nctu.minuku_2.service.BackgroundService;
 import edu.nctu.minuku_2.service.NotificationListener;
 import edu.nctu.minuku.service.MobileAccessibilityService;
+import android.content.SharedPreferences;
 
 /**
  * Created by Lawrence on 2017/7/19.
@@ -27,7 +29,10 @@ public class BootCompleteReceiver extends BroadcastReceiver {
         if(intent.getAction().equalsIgnoreCase(Intent.ACTION_BOOT_COMPLETED))
         {
             Log.d(TAG,"boot_complete in first");
-
+            SharedPreferences pref = context.getSharedPreferences("edu.nctu.minuku", context.MODE_PRIVATE);
+            pref.edit()
+                    .putLong("state_bootcomplete", System.currentTimeMillis() / 1000L)
+                    .apply();
             try{
                 dbhelper = new DBHelper(context);
                 dbhelper.getWritableDatabase();

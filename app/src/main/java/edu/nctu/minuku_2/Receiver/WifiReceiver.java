@@ -61,6 +61,7 @@ import edu.nctu.minuku.model.DataRecord.ActivityRecognitionDataRecord;
 import edu.nctu.minuku.streamgenerator.ConnectivityStreamGenerator;
 import edu.nctu.minuku.manager.MinukuDAOManager;
 import edu.nctu.minuku_2.R;
+import android.content.SharedPreferences;
 
 import java.lang.Long;
 import com.amplitude.api.Amplitude;
@@ -110,7 +111,7 @@ public class WifiReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Amplitude.getInstance().logEvent("WIFI_ONRECEIVED");
+//        Amplitude.getInstance().logEvent("WIFI_ONRECEIVED");
 
 
 
@@ -159,9 +160,13 @@ public class WifiReceiver extends BroadcastReceiver {
             if (activeNetwork.getType() == ConnectivityManager.TYPE_WIFI) {
                 // connected to wifi
                 Log.d(TAG,"INTERNETEVENT: Wifi activeNetwork");
-                Amplitude.getInstance().logEvent("WIFI_GET_WIFI_START_THREAD");
+//                Amplitude.getInstance().logEvent("WIFI_GET_WIFI_START_THREAD");
 
                 //do the work here.
+                SharedPreferences pref = context.getSharedPreferences("edu.nctu.minuku", context.MODE_PRIVATE);
+                pref.edit()
+                        .putLong("state_wifi_upload", System.currentTimeMillis() / 1000L)
+                        .apply();
                 MakingJsonDumpDataMainThread();
 //                MakingJsonTripDataMainThread();
 
@@ -178,7 +183,7 @@ public class WifiReceiver extends BroadcastReceiver {
         } else {
             // not connected to the internet
             Log.d(TAG, "INTERNETEVENT: no Network" ) ;
-            Amplitude.getInstance().logEvent("WIFI_NO_WIFI");
+//            Amplitude.getInstance().logEvent("WIFI_NO_WIFI");
 
             Answers.getInstance().logContentView(new ContentViewEvent().putContentName("wifireceiver no wifi").putCustomAttribute("device_id", Constants.DEVICE_ID));
 
@@ -191,6 +196,7 @@ public class WifiReceiver extends BroadcastReceiver {
     }
 
     public void MakingJsonDumpDataMainThread(){
+
 
         Log.d(TAG, "MakingJsonDumpDataMainThread") ;
         Answers.getInstance().logContentView(new ContentViewEvent().putContentName("MakingJsonDumpDataMainThread").putCustomAttribute("device_id", Constants.DEVICE_ID));
@@ -224,7 +230,7 @@ public class WifiReceiver extends BroadcastReceiver {
 //            return;
 //        }
 
-        Amplitude.getInstance().logEvent("WIFI_START_DUMP_DATA");
+//        Amplitude.getInstance().logEvent("WIFI_START_DUMP_DATA");
         int max_try = 100;
 
         try {
@@ -374,7 +380,7 @@ public class WifiReceiver extends BroadcastReceiver {
     public String postJSON (String address, String json, String dataType, String lastSyncTime) {
 
         Log.d(TAG, "[postJSON] testbackend post data to " + address);
-        Amplitude.getInstance().logEvent("postJSON");
+//        Amplitude.getInstance().logEvent("postJSON");
 
         InputStream inputStream = null;
         String result = "";
@@ -433,11 +439,11 @@ public class WifiReceiver extends BroadcastReceiver {
 
             }
 
-            Amplitude.getInstance().logEvent("response", responseJson);
+//            Amplitude.getInstance().logEvent("response", responseJson);
 
             Log.d(TAG, "[postJSON] the result response code is " + responseCode);
             Log.d(TAG, "[postJSON] the result is " + result);
-            Amplitude.getInstance().logEvent("WIFI_START_UPLOAD_SUCCESS");
+//            Amplitude.getInstance().logEvent("WIFI_START_UPLOAD_SUCCESS");
 
             try {
                 JSONObject obj = new JSONObject(result);
@@ -455,11 +461,11 @@ public class WifiReceiver extends BroadcastReceiver {
 //                deleteSensor(r_startTime, r_endTime);
 //                deleteAccessibility(r_startTime, r_endTime);
 //                deleteNotification(r_startTime, r_endTime);
-                Amplitude.getInstance().logEvent("DELETE_SUCCESS");
+//                Amplitude.getInstance().logEvent("DELETE_SUCCESS");
 
 
             }catch (JSONException e){
-                Amplitude.getInstance().logEvent("DELETE_EXCEPTION");
+//                Amplitude.getInstance().logEvent("DELETE_EXCEPTION");
             }
 
 
@@ -467,19 +473,19 @@ public class WifiReceiver extends BroadcastReceiver {
 
         }
         catch (NoSuchAlgorithmException e) {
-            Amplitude.getInstance().logEvent("NoSuchAlgorithmException");
+//            Amplitude.getInstance().logEvent("NoSuchAlgorithmException");
             e.printStackTrace();
         } catch (KeyManagementException e) {
-            Amplitude.getInstance().logEvent("KeyManagementException");
+//            Amplitude.getInstance().logEvent("KeyManagementException");
             e.printStackTrace();
         } catch (ProtocolException e) {
-            Amplitude.getInstance().logEvent("ProtocolException");
+//            Amplitude.getInstance().logEvent("ProtocolException");
             e.printStackTrace();
         } catch (MalformedURLException e) {
-            Amplitude.getInstance().logEvent("MalformedURLException");
+//            Amplitude.getInstance().logEvent("MalformedURLException");
             e.printStackTrace();
         } catch (IOException e) {
-            Amplitude.getInstance().logEvent("IOException");
+//            Amplitude.getInstance().logEvent("IOException");
             e.printStackTrace();
         }
 
@@ -562,7 +568,7 @@ public class WifiReceiver extends BroadcastReceiver {
 //            i = Long.parseLong(v);
 
         } catch (Exception e){
-            Amplitude.getInstance().logEvent("getOldestDataTime_fail");
+//            Amplitude.getInstance().logEvent("getOldestDataTime_fail");
             return Boolean.FALSE;
         }
 
@@ -587,7 +593,7 @@ public class WifiReceiver extends BroadcastReceiver {
             } catch (JSONException e) {
 
             }
-            Amplitude.getInstance().logEvent("getOldestDataTime", data);
+//            Amplitude.getInstance().logEvent("getOldestDataTime", data);
             Log.d(TAG, "getOldestDataTime TRUE");
             return Boolean.TRUE;
         }
@@ -1485,7 +1491,7 @@ public class WifiReceiver extends BroadcastReceiver {
 
             int rows = transCursor.getCount();
             JSONObject a_data = new JSONObject();
-            Amplitude.getInstance().logEvent("storeAccessibility", a_data.put("row", rows));
+//            Amplitude.getInstance().logEvent("storeAccessibility", a_data.put("row", rows));
 
 //            Log.d(TAG, "rows : "+rows);
 

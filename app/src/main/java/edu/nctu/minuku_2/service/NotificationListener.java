@@ -78,7 +78,7 @@ public class NotificationListener extends NotificationListenerService {
     private String tickerText;
     private String app;
     private Boolean send_form;
-    private String last_title;
+    private String  last_title;
     private Boolean skip_form;
 
     private SharedPreferences sharedPrefs;
@@ -97,6 +97,7 @@ public class NotificationListener extends NotificationListenerService {
         public static final String MESSENGER_LITE_PACK_NAME = "com.facebook.mlite";
         public static final String LINE_PACK_NAME = "jp.naver.line.android";
         public static final String LINE2_PACK_NAME = "jp.naver.line.androie";
+        public static final String LINE2_LITE_PACK_NAME = "com.linecorp.linelite";
     }
 
     public static final class InterceptedNotificationCode {
@@ -110,12 +111,16 @@ public class NotificationListener extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        Amplitude.getInstance().logEvent("GET_NOTIFICATION");
+//        Amplitude.getInstance().logEvent("GET_NOTIFICATION");
+
+        SharedPreferences pref = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE);
+        pref.edit()
+                .putLong("state_notification_listen", System.currentTimeMillis() / 1000L)
+                .apply();
 
         long unixTime = System.currentTimeMillis() / 1000L;
 
         sharedPrefs = getSharedPreferences(getString(R.string.sharedPreference), MODE_PRIVATE);
-        SharedPreferences pref = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE);
 
         send_form = Boolean.FALSE;
         skip_form = Boolean.FALSE;
@@ -196,10 +201,10 @@ public class NotificationListener extends NotificationListenerService {
             Log.d(TAG,"Save Notification_ALL");
 
             db.insert(DBHelper.notification_table, null, values);
-            Amplitude.getInstance().logEvent("Notification_ALL");
+//            Amplitude.getInstance().logEvent("Notification_ALL");
         } catch (NullPointerException e) {
             e.printStackTrace();
-            Amplitude.getInstance().logEvent("Notification_ALL_FAILED");
+//            Amplitude.getInstance().logEvent("Notification_ALL_FAILED");
         } finally {
             values.clear();
             DBManager.getInstance().closeDatabase();
@@ -214,7 +219,7 @@ public class NotificationListener extends NotificationListenerService {
                 if(sbn.getPackageName().equals(ApplicationPackageNames.MESSENGER_LITE_PACK_NAME)){
                     app = "fb_lite";
                 }
-                if(tickerText.contains("對話中有新訊息") || title.contains("聊天大頭貼使用中") || tickerText.contains("傳送") || tickerText.contains("You missed a call from") || tickerText.contains("你錯過了") || tickerText.contains("sent") || tickerText.contains("reacted") || tickerText.contains("貼圖") || tickerText.contains("送出") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty() || text.contains("：") || text.contains(":")){
+                if(title.contains("Noti Mui") || tickerText.contains("對話中有新訊息") || tickerText.contains("\uD83D\uDC4D") || title.contains("聊天大頭貼使用中") || tickerText.contains("傳送") || tickerText.contains("You missed a call from") || tickerText.contains("你錯過了") || tickerText.contains("sent") || tickerText.contains("reacted") || tickerText.contains("貼圖") || tickerText.contains("送出") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty() || text.contains("：") || text.contains(":")){
                     skip_form = Boolean.TRUE;
                     if(text.startsWith(title) && text.contains(":")){
                         skip_form = Boolean.FALSE;
@@ -223,9 +228,36 @@ public class NotificationListener extends NotificationListenerService {
             }
             else if(sbn.getPackageName().equals(ApplicationPackageNames.LINE_PACK_NAME)){
                 app = "line";
-                if(tickerText.contains("You have a new message") || title.contains(" - ") || text.contains("邀請您加入") || title.contains("LINE") || tickerText.contains("LINE") || text.contains("LINE")  || tickerText.contains("貼圖") ||  tickerText.contains("LINE") || tickerText.contains("您有新訊息")  || tickerText.contains("傳送了") || tickerText.contains("記事本") || tickerText.contains("已建立")|| tickerText.contains("added a note") || tickerText.contains("sent") ||  tickerText.contains("語音訊息") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty() || !subText.isEmpty()){
+                if(tickerText.contains("You have a new message") || title.contains(" - ") || text.contains("邀請您加入") || title.contains("LINE") || tickerText.contains("LINE") || text.contains("LINE")  || tickerText.contains("貼圖") ||  tickerText.contains("LINE") || tickerText.contains("您有新訊息")  || tickerText.contains("傳送了") || tickerText.contains("記事本") || tickerText.contains("已建立")|| tickerText.contains("added a note") || tickerText.contains("sent") ||  tickerText.contains("語音訊息") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty() || (!subText.isEmpty() && !subText.contains("則新訊息"))){
                     skip_form = Boolean.TRUE;
                 }
+            }
+
+//            if(sbn.getPackageName().equals(ApplicationPackageNames.FACEBOOK_MESSENGER_PACK_NAME) || sbn.getPackageName().equals(ApplicationPackageNames.MESSENGER_LITE_PACK_NAME)){
+//                app = "fb";
+//                if(sbn.getPackageName().equals(ApplicationPackageNames.MESSENGER_LITE_PACK_NAME)){
+//                    app = "fb_lite";
+//                }
+//                if(title.contains("Noti Mui") || tickerText.contains("對話中有新訊息") || tickerText.contains("\uD83D\uDC4D") || title.contains("聊天大頭貼使用中") || tickerText.contains("傳送") || tickerText.contains("You missed a call from") || tickerText.contains("你錯過了") || tickerText.contains("sent") || tickerText.contains("reacted") || tickerText.contains("貼圖") || tickerText.contains("送出") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty()){
+//                    skip_form = Boolean.TRUE;
+//                }
+//            }
+//            else if(sbn.getPackageName().equals(ApplicationPackageNames.LINE_PACK_NAME)){
+//                app = "line";
+//                if(tickerText.contains("You have a new message") || text.contains("邀請您加入") || title.contains("LINE") || tickerText.contains("LINE") || text.contains("LINE")  || tickerText.contains("貼圖") ||  tickerText.contains("您有新訊息")  || tickerText.contains("傳送了") || tickerText.contains("記事本") || tickerText.contains("已建立")|| tickerText.contains("added a note") || tickerText.contains("sent") ||  tickerText.contains("語音訊息") ||  tickerText.contains("Wi-Fi") || tickerText.isEmpty() || title.isEmpty() || text.isEmpty()){
+//                    skip_form = Boolean.TRUE;
+//                }
+//            }
+
+            String blacklist = getSharedPreferences("edu.nctu.minuku", MODE_PRIVATE)
+                    .getString("blacklist", "");
+
+            Log.d(TAG,"current blacklist"+ blacklist);
+
+            if(blacklist.contains(title)){
+                skip_form = Boolean.TRUE;
+                Log.d(TAG,"skip form by blacklist");
+
             }
 
             JSONObject manJson = new JSONObject();
@@ -305,8 +337,13 @@ public class NotificationListener extends NotificationListenerService {
 
             isAccessibilityEnabled();
 
-            Amplitude.getInstance().logEvent("READY_TO_SEND_FORM", amplitudeJson);
-            if(!skip_form && !title.equals(last_title) && (unixTime - last_form_notification_sent_time > 600) && (unixTime - last_form_done_time > 45*60)) {
+//            Amplitude.getInstance().logEvent("READY_TO_SEND_FORM", amplitudeJson);
+//            if((title.contains("Noti Mui") && text.contains("測試測試")) || !title.equals(last_title) && (unixTime - last_form_notification_sent_time > 600) && (unixTime - last_form_done_time > 30*60)) { // for chui
+
+                if((text.contains("測試測試")) || !skip_form && !title.equals(last_title) && (unixTime - last_form_notification_sent_time > 600) && (unixTime - last_form_done_time > 45*60)) {
+                pref.edit()
+                        .putLong("state_notification_sent_esm", System.currentTimeMillis() / 1000L)
+                        .apply();
                 try {
                     SQLiteDatabase db = DBManager.getInstance().openDatabase();
                     values.put(DBHelper.TIME, new Date().getTime());
@@ -318,19 +355,17 @@ public class NotificationListener extends NotificationListenerService {
                     values.put(DBHelper.sendForm_col, Boolean.TRUE);
                     values.put(DBHelper.longitude_col, (float)LocationStreamGenerator.longitude.get());
                     values.put(DBHelper.latitude_col, (float)LocationStreamGenerator.latitude.get());
-                    Log.d(TAG, values.toString());
-                    Log.d(TAG,"Save Notification WITH_FORM");
 
                     db.insert(DBHelper.notification_table, null, values);
-                    Amplitude.getInstance().logEvent("SAVE_NOTIFICATION_WITH_FORM");
+
                 } catch (NullPointerException e) {
                     e.printStackTrace();
-                    Amplitude.getInstance().logEvent("SAVE_NOTIFICATION_FAILED");
+//                    Amplitude.getInstance().logEvent("SAVE_NOTIFICATION_FAILED");
                 } finally {
                     values.clear();
                     DBManager.getInstance().closeDatabase();
                 }
-                Amplitude.getInstance().logEvent("SUCCESS_SEND_FORM");
+//                Amplitude.getInstance().logEvent("SUCCESS_SEND_FORM");
                 pref.edit()
                         .putLong("last_form_notification_sent_time", unixTime)
                         .apply();
@@ -390,6 +425,9 @@ public class NotificationListener extends NotificationListenerService {
             return(InterceptedNotificationCode.LINE_CODE);
         }
         else if(packageName.equals(ApplicationPackageNames.LINE2_PACK_NAME)){
+            return(InterceptedNotificationCode.LINE_CODE);
+        }
+        else if(packageName.equals(ApplicationPackageNames.LINE2_LITE_PACK_NAME)){
             return(InterceptedNotificationCode.LINE_CODE);
         }
         else if(packageName.equals(ApplicationPackageNames.MESSENGER_LITE_PACK_NAME)){

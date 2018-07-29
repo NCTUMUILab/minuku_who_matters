@@ -57,10 +57,10 @@ public class AccessibilityStreamGenerator extends AndroidStreamGenerator<Accessi
         } catch (SecurityException e){
             deviceId = "null";
         }
-        Amplitude.getInstance().initialize(this.mContext, "357d2125a984bc280669e6229646816c");
-        Identify identify = new Identify().set("DEVICE_ID", deviceId);
-        Amplitude.getInstance().identify(identify);
-        Amplitude.getInstance().logEvent("INIT_AccessibilityStreamGenerator");
+//        Amplitude.getInstance().initialize(this.mContext, "357d2125a984bc280669e6229646816c");
+//        Identify identify = new Identify().set("DEVICE_ID", deviceId);
+//        Amplitude.getInstance().identify(identify);
+//        Amplitude.getInstance().logEvent("INIT_AccessibilityStreamGenerator");
 
         mobileAccessibilityService = new MobileAccessibilityService(this);
 
@@ -113,7 +113,7 @@ public class AccessibilityStreamGenerator extends AndroidStreamGenerator<Accessi
             if(!type.isEmpty()){
                 mDAO.add(accessibilityDataRecord);
                 Log.d(TAG, "updateStream add success");
-                Amplitude.getInstance().logEvent("Accessibility_updateStream_SUCCESS");
+//                Amplitude.getInstance().logEvent("Accessibility_updateStream_SUCCESS");
             }
 
         } catch (DAOException e) {
